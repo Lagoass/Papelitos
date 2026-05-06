@@ -213,7 +213,7 @@ tiebreaker
   └─[GAME_OVER] (aceitar empate)──────────────────→ gameOver
 
 gameOver
-  └─ estado terminal. localStorage é limpo.
+  └─ estado terminal. localStorage limpo via GameContext useEffect (ver seção 12).
 ```
 
 ---
@@ -266,7 +266,6 @@ gameOver
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `START_TIEBREAKER` | — | `phase → 'tiebreaker'`. Reseta `tiebreakerFormat: null` — o grupo escolhe o formato a cada nova rodada de desempate. |
 | `SELECT_TIEBREAKER_FORMAT` | `1 \| 2 \| 3 \| 4` | `tiebreakerFormat = payload`. `phase → 'roulette'` (sorteia time que começa). |
 | `RANDOMIZE_TIEBREAKER_FORMAT` | — | `tiebreakerFormat = random(1,4)`. `phase → 'roulette'`. |
 
@@ -292,7 +291,7 @@ Após cada `HIT`, verificar na seguinte ordem:
 if (queue.length === 0) {
   if (round === 4) {
     if (teams.A.score === teams.B.score) {
-      return { ...state, phase: 'tiebreaker', currentWord: null }
+      return { ...state, phase: 'tiebreaker', currentWord: null, tiebreakerFormat: null }
     } else {
       return { ...state, phase: 'gameOver', currentWord: null }
     }
@@ -304,7 +303,7 @@ if (queue.length === 0) {
 return { ...state, queue, currentWord: queue[0] }
 ```
 
-O reducer nunca chama `dispatch`. Ele recebe estado e action, e retorna novo estado diretamente. Toda transição de fase acontece via `return`.
+O reducer nunca chama `dispatch`. Ele recebe estado e action, e retorna novo estado diretamente. Toda transição de fase acontece via `return`. O reset de `tiebreakerFormat: null` ocorre aqui — não via `START_TIEBREAKER`.
 
 ### 8.3 Imutabilidade do Pool e Distinção Round vs Turno
 
@@ -377,7 +376,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 - Toggle/seletor de time (A ou B) — obrigatório antes de liberar os campos de palavra.
 - Campos de texto: exatamente `wordsPerPlayer` campos.
 - **Edição livre:** todos os campos permanecem editáveis até o clique em Confirmar. O jogador pode alterar qualquer palavra quantas vezes quiser enquanto o dispositivo estiver com ele. Confirmar é a única ação que torna as palavras permanentes.
-- **Modo Temático:** cada campo exibe `themes[i]` como label fixo acima do input — não como placeholder. O label persiste enquanto o jogador digita. Ao disparar `ADD_WORD`, a tela passa `theme: themes[i]` no payload com base no índice do campo.
+- **Modo Temático:** cada campo exibe `themes[i]` como label fixo acima do input — não como placeholder. O label persiste enquanto o jogador digita. O tema correspondente é incluído automaticamente no batch do `PLAYER_CONFIRMED` via `theme: themes[i]`.
 - **Auto-foco:** ao entrar na tela, foco vai para o primeiro campo vazio. Após confirmar cada palavra (Enter ou blur), foco avança para o próximo campo vazio. Se todos preenchidos, foco vai para o botão de confirmar.
 - Botão "Confirmar" só fica habilitado quando **todos** os campos estiverem preenchidos e o time estiver selecionado.
 - Ao confirmar: a tela monta o array de words em batch — `fields.map((text, i) => ({ text, theme: mode === 'themed' ? themes[i] : null }))` — e dispara `PLAYER_CONFIRMED` com esse payload. `phase → 'wordInputPass'`.
@@ -414,7 +413,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 
 ### RoundTransitionScreen
 - Exibe o resultado da rodada que acabou (pontos marcados nela — opcional, se quiser derivar do state).
-- Exibe o ícone, número e regra da próxima rodada.
+- Exibe o ícone, número e regra da **próxima** rodada usando `ROUNDS[round + 1]`. Quando esta tela abre, `round` ainda tem o valor da rodada que terminou — `ADVANCE_ROUND` só o incrementa quando o usuário clicar "Continuar".
 - Botão "Continuar" → dispara `ADVANCE_ROUND`.
 
 ### TiebreakerScreen
@@ -543,7 +542,7 @@ useEffect(() => {
 
 - **Chave:** `'papelito_game_state'`
 - **Quando salvar:** após cada dispatch de qualquer action.
-- **Quando limpar:** na action `GAME_OVER` e ao iniciar nova partida.
+- **Quando limpar:** quando `phase === 'gameOver'` (detectado via `useEffect` no `GameContext`, ver seção 12) e ao iniciar nova partida.
 - **O que persiste:** o `GameState` completo, serializado via `JSON.stringify`.
 - **O que não persiste:** histórico de partidas anteriores, configurações entre sessões.
 - **Ao abrir o app:** se `localStorage` contém estado com `phase` diferente de `'setup'` e `'gameOver'`, exibir um **modal de retomada** sobre o `SetupScreen` com duas opções: **"Retomar partida"** (carrega o estado salvo e navega para a phase correspondente) e **"Nova partida"** (usa `CountdownLock` de 5 segundos — ao confirmar, limpa o storage e permanece no `SetupScreen`). O travamento evita que uma partida em andamento seja perdida por toque acidental.
