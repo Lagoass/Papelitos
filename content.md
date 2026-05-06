@@ -96,12 +96,12 @@ papelito/
   playerIndex: number,     // índice 0-based do jogador que criou — determina a cor
 }
 
-// Player — 4 slots criados em SETUP_COMPLETE (mínimo obrigatório).
-// Slots adicionais criados via NEXT_PLAYER conforme mais jogadores entram.
+// Player — criado incrementalmente conforme cada jogador passa pelo dispositivo.
+// Primeiro slot criado em SETUP_COMPLETE. Slots subsequentes criados em NEXT_PLAYER.
 {
-  index:  number,          // 0-based. "Jogador N" = index + 1
+  index:  number,            // 0-based. "Jogador N" = index + 1
   teamId: 'A' | 'B' | null, // null até o jogador escolher o time em wordInput
-  color:  string,          // PLAYER_COLORS[index] — atribuído automaticamente na criação
+  color:  string,            // getColor(index) — atribuído automaticamente na criação
 }
 
 // TeamState — estado de cada time
@@ -134,10 +134,9 @@ const initialState = {
   themes:         [],        // [] no Modo Normal. No Modo Temático, cada string é um tema.
 
   // ── JOGADORES ─────────────────────────────────────────────────────────────
-  // 4 slots criados em SETUP_COMPLETE com teamId: null e color atribuída.
-  // Slots adicionais criados em NEXT_PLAYER se mais jogadores quiserem entrar.
+  // Primeiro slot criado em SETUP_COMPLETE. Cada NEXT_PLAYER cria o próximo.
   // teamId é preenchido pelo próprio jogador durante wordInput via SET_PLAYER_TEAM.
-  players: [],               // Player[] — populado em SETUP_COMPLETE (4 slots iniciais)
+  players: [],               // Player[] — cresce incrementalmente durante wordInput
 
   // Índice do jogador atualmente inserindo palavras.
   // Incrementado a cada NEXT_PLAYER.
@@ -208,7 +207,8 @@ roundTransition
   └─[ADVANCE_ROUND]───────────────────────────────→ turnPass
 
 tiebreaker
-  └─[TIEBREAKER_FORMAT_SELECTED]──────────────────→ roulette (sorteia time) → turnPass
+  ├─[SELECT_TIEBREAKER_FORMAT]────────────────────→ roulette (sorteia time) → turnPass
+  └─[RANDOMIZE_TIEBREAKER_FORMAT]─────────────────→ roulette (sorteia time) → turnPass
 
 gameOver
   └─ estado terminal. localStorage é limpo.
@@ -227,7 +227,7 @@ gameOver
 | `SET_WORDS_PER_PLAYER` | `number` | Só válido no Modo Normal. |
 | `ADD_THEME` | `string` | Adiciona ao array `themes`. `wordsPerPlayer` passa a ser `themes.length`. |
 | `REMOVE_THEME` | `string` | Remove do array `themes`. Recalcula `wordsPerPlayer`. |
-| `SETUP_COMPLETE` | — | Cria 4 slots em `players[]` com `index: 0–3`, `teamId: null`, `color: getColor(index)`. `phase → 'wordInput'`. |
+| `SETUP_COMPLETE` | — | Cria apenas o primeiro slot em `players[]`: `{ index: 0, teamId: null, color: getColor(0) }`. `phase → 'wordInput'`. |
 
 ### Inserção de Palavras
 
@@ -236,7 +236,7 @@ gameOver
 | `SET_PLAYER_TEAM` | `'A' \| 'B'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. |
 | `ADD_WORD` | `{ text, theme? }` | Cria uma `Word` com `id = crypto.randomUUID()`, `playerIndex = wordInputCurrentIndex`. No Modo Temático, `theme` é passado pela tela com base no índice do campo (`themes[i]`). Adiciona ao `pool`. |
 | `PLAYER_CONFIRMED` | — | Irreversível. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. |
-| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex`. Cria novo slot em `players[]` com `index: wordInputCurrentIndex`, `teamId: null`, `color: getColor(index)`. `phase → 'wordInput'`. |
+| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex`. Cria o próximo slot em `players[]`: `{ index: wordInputCurrentIndex, teamId: null, color: getColor(wordInputCurrentIndex) }`. `phase → 'wordInput'`. |
 | `START_GAME` | — | Validação deve passar (ver seção 8.1). Trava o `pool`. `phase → 'roulette'`. |
 
 ### Roulette e Início
@@ -275,12 +275,12 @@ gameOver
 
 ### 8.1 Validação do START_GAME
 
-`START_GAME` só é processado se:
+`START_GAME` só é processado se todas as três condições forem satisfeitas simultaneamente:
 - `players.length >= 4`
 - `teams.A.playerIndices.length >= 2`
 - `teams.B.playerIndices.length >= 2`
 
-O botão "Iniciar Jogo" só é **renderizado** na `WordInputPassScreen` quando essas três condições são satisfeitas simultaneamente. Se o botão não aparece, não há erro — a condição simplesmente não foi atingida ainda.
+O botão "Iniciar Jogo" só é **renderizado** na `WordInputPassScreen` quando essas três condições são verdadeiras. Se o botão não aparece, não há erro — as condições simplesmente ainda não foram atingidas.
 
 ### 8.2 Detecção de Fim de Rodada e Fim de Jogo
 
@@ -502,8 +502,26 @@ const { save, load, clear } = useLocalStorage(key: string)
 - `save(state)` → serializa e persiste o `GameState` completo.
 - `load()` → desserializa e retorna o estado ou `null` se não existir.
 - `clear()` → remove a chave.
-- Chamado em `App.jsx`: ao inicializar, tenta `load()`. Se encontrar estado salvo com `phase !== 'gameOver'` e `phase !== 'setup'`, oferece retomada.
-- O reducer chama `save` após cada action via middleware/efeito no `GameContext`.
+
+Duas responsabilidades distintas, em lugares distintos:
+
+**`GameContext.jsx` — save contínuo:**
+```javascript
+useEffect(() => {
+  save(state)
+}, [state])
+```
+Roda após cada render onde `state` mudou. Garante que o localStorage está sempre sincronizado com o estado atual sem violar a pureza do reducer.
+
+**`App.jsx` — load único na inicialização:**
+```javascript
+useEffect(() => {
+  const saved = load()
+  if (saved && saved.phase !== 'setup' && saved.phase !== 'gameOver') {
+    // exibe modal de retomada
+  }
+}, []) // array vazio → roda apenas uma vez, na montagem
+```
 
 ---
 
