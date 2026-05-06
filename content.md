@@ -102,7 +102,7 @@ papelito/
 {
   index:  number,            // 0-based. "Jogador N" = index + 1
   teamId: 'A' | 'B' | null, // null até o jogador escolher o time em wordInput
-  color:  string,            // getColor(index) — atribuído automaticamente na criação
+  // cor não é armazenada — sempre derivada via getColor(index) sob demanda (ver seção 11)
 }
 
 // TeamState — estado de cada time
@@ -229,15 +229,15 @@ gameOver
 | `SET_WORDS_PER_PLAYER` | `number` | Só válido no Modo Normal. |
 | `ADD_THEME` | `string` | Adiciona ao array `themes`. `wordsPerPlayer` passa a ser `themes.length`. |
 | `REMOVE_THEME` | `string` | Remove do array `themes`. Recalcula `wordsPerPlayer`. |
-| `SETUP_COMPLETE` | — | Cria apenas o primeiro slot em `players[]`: `{ index: 0, teamId: null, color: getColor(0) }`. `phase → 'wordInput'`. |
+| `SETUP_COMPLETE` | — | Cria apenas o primeiro slot em `players[]`: `{ index: 0, teamId: null }`. `phase → 'wordInput'`. |
 
 ### Inserção de Palavras
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
 | `SET_PLAYER_TEAM` | `'A' \| 'B'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. |
-| `PLAYER_CONFIRMED` | `{ words: [{ text, theme? }] }` | Irreversível. Recebe todas as palavras do jogador em batch. Para cada word, cria `{ id: crypto.randomUUID(), text, theme, playerIndex: wordInputCurrentIndex }` e adiciona ao `pool`. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. No Modo Temático, cada word inclui `theme: themes[i]` — montado pela tela antes do dispatch. No Modo Normal, `theme: null`. |
-| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null, color: getColor(N+1) }`. `phase → 'wordInput'`. |
+| `PLAYER_CONFIRMED` | `{ words: [{ text, theme? }] }` | Irreversível. Recebe todas as palavras do jogador em batch. Para cada word, cria `{ id: crypto.randomUUID(), text, theme, playerIndex: wordInputCurrentIndex }` e adiciona ao `pool`. O `teamId` usado é `players[wordInputCurrentIndex].teamId` — atribuído anteriormente via `SET_PLAYER_TEAM`. O botão Confirmar só fica habilitado quando `teamId !== null`, garantindo que nunca seja null aqui. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. No Modo Temático, cada word inclui `theme: themes[i]` — montado pela tela antes do dispatch. No Modo Normal, `theme: null`. |
+| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null }`. `phase → 'wordInput'`. |
 | `START_GAME` | — | Validação deve passar (ver seção 8.1). Trava o `pool`. `phase → 'roulette'`. |
 
 ### Roulette e Início
@@ -251,7 +251,7 @@ gameOver
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
 | `TURN_CONFIRMED` | — | `currentWord = queue[0]`. `phase → 'playing'`. |
-| `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue`. Verifica se `queue.length === 0` (ver seção 8.2). Caso contrário: `currentWord = queue[0]`. |
+| `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue` filtrando por id: `queue.filter(w => w.id !== currentWord.id)`. Verifica se `queue.length === 0` (ver seção 8.2). Caso contrário: `currentWord = queue[0]`. |
 | `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. |
 | `END_TURN` | — | Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. Alterna `currentTeamId`. `turnHits = 0`. `phase → 'turnPass'`. |
 
@@ -261,6 +261,7 @@ gameOver
 |--------|---------|---------------|
 | `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = time oposto ao roundStartTeam atual`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `turnHits = 0`. `phase → 'turnPass'`. |
 | `GAME_OVER` | — | `phase → 'gameOver'`. O reducer não toca o localStorage — side effect tratado pelo `GameContext` (ver seção 12). |
+| `RESET_GAME` | — | Retorna `initialState` diretamente. Disparado pelo `ResultsScreen` ao confirmar "Nova Partida". O localStorage já foi limpo pelo `GameContext` quando `phase` virou `'gameOver'`. |
 
 ### Desempate
 
@@ -372,7 +373,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 - Botão "Continuar" dispara `SETUP_COMPLETE`.
 
 ### WordInputScreen
-- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `PLAYER_COLORS[wordInputCurrentIndex]`.
+- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `getColor(wordInputCurrentIndex)`.
 - Toggle/seletor de time (A ou B) — obrigatório antes de liberar os campos de palavra.
 - Campos de texto: exatamente `wordsPerPlayer` campos.
 - **Edição livre:** todos os campos permanecem editáveis até o clique em Confirmar. O jogador pode alterar qualquer palavra quantas vezes quiser enquanto o dispositivo estiver com ele. Confirmar é a única ação que torna as palavras permanentes.
@@ -392,23 +393,25 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
   - Ao confirmar: dispara `START_GAME`.
 
 ### RouletteScreen
-- Animação visual de roleta sorteando "Time A" ou "Time B".
-- Ao finalizar a animação: dispara `ROULETTE_DONE` com o resultado.
+- O componente gera o time vencedor localmente via `Math.random() < 0.5 ? 'A' : 'B'` antes de iniciar a animação.
+- Exibe animação visual de roleta revelando o time sorteado.
+- Ao finalizar a animação: dispara `ROULETTE_DONE` com o valor gerado como payload.
 - Reutilizada no desempate (mesmo comportamento).
 
 ### TurnPassScreen
 - Exibe: "Vez do Time [X]" com a cor do time.
 - Exibe o placar atual (`ScoreBoard`).
-- Exibe a rodada atual (`RoundBadge`).
+- Exibe `RoundBadge` com as regras da rodada ativa: usa `ROUNDS[tiebreakerFormat]` quando `tiebreakerFormat !== null`, e `ROUNDS[round]` nos demais casos — mesma lógica do `TurnScreen`.
 - Botão "Estou pronto" — **sempre visível**. Não há lógica de visibilidade por jogador. O jogo parte do pressuposto social de que o dispositivo já está nas mãos do jogador correto do time indicado. Dispara `TURN_CONFIRMED`.
 
 ### TurnScreen
-- Exibe `WordCard` com o texto de `currentWord` na cor `PLAYER_COLORS[currentWord.playerIndex]`.
+- Exibe `WordCard` com o texto de `currentWord` na cor `getColor(currentWord.playerIndex)`.
 - Exibe `Timer` em contagem regressiva a partir de `turnDuration`.
 - Exibe `RoundBadge` com as regras da rodada ativa: usa `ROUNDS[tiebreakerFormat]` quando `tiebreakerFormat !== null`, e `ROUNDS[round]` nos demais casos.
+- Chama `timer.start()` no `useEffect` de montagem — o timer inicia assim que a tela entra em cena. Chama `timer.reset()` na desmontagem.
 - Botão "✅ Acertou" → dispara `HIT`.
 - Botão "⏭️ Pular" → dispara `SKIP`.
-- Quando o timer zera: `useTimer` dispara `END_TURN` automaticamente.
+- Quando o timer zera: `useTimer` dispara `END_TURN` automaticamente via `onEnd`.
 - `useWakeLock` ativo nesta tela — solicita Wake Lock ao entrar, libera ao sair.
 
 ### RoundTransitionScreen
@@ -425,7 +428,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 ### ResultsScreen
 - Exibe placar final de ambos os times.
 - Exibe o time vencedor em destaque.
-- Botão "Nova Partida" → usa `CountdownLock` de 5 segundos. Ao confirmar: limpa `localStorage`, reseta o estado para `initialState` e navega para `setup`.
+- Botão "Nova Partida" → usa `CountdownLock` de 5 segundos. Ao confirmar: dispara `RESET_GAME`, que retorna o estado para `initialState` e navega para `setup`. O localStorage já foi limpo automaticamente pelo `GameContext` ao entrar em `gameOver`.
 
 ---
 
@@ -493,7 +496,7 @@ const { timeLeft, isRunning, start, pause, reset } = useTimer({
 ```
 - Usa `setInterval` internamente.
 - `reset()` restaura `timeLeft` para `duration` e para o intervalo.
-- O timer não reinicia automaticamente — deve ser iniciado explicitamente via `start()` em `TURN_CONFIRMED`.
+- O timer não reinicia automaticamente — é iniciado pela `TurnScreen` via `start()` no `useEffect` de montagem do componente. Quando `TurnScreen` desmonta, o timer deve ser pausado ou resetado via `reset()`.
 
 ### useWakeLock
 ```javascript
