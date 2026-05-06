@@ -209,7 +209,8 @@ roundTransition
 
 tiebreaker
   ├─[SELECT_TIEBREAKER_FORMAT]────────────────────→ roulette (sorteia time) → turnPass
-  └─[RANDOMIZE_TIEBREAKER_FORMAT]─────────────────→ roulette (sorteia time) → turnPass
+  ├─[RANDOMIZE_TIEBREAKER_FORMAT]─────────────────→ roulette (sorteia time) → turnPass
+  └─[GAME_OVER] (aceitar empate)──────────────────→ gameOver
 
 gameOver
   └─ estado terminal. localStorage é limpo.
@@ -235,8 +236,7 @@ gameOver
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
 | `SET_PLAYER_TEAM` | `'A' \| 'B'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. |
-| `ADD_WORD` | `{ text, theme? }` | Cria uma `Word` com `id = crypto.randomUUID()`, `playerIndex = wordInputCurrentIndex`. No Modo Temático, `theme` é passado pela tela com base no índice do campo (`themes[i]`). Adiciona ao `pool`. |
-| `PLAYER_CONFIRMED` | — | Irreversível. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. |
+| `PLAYER_CONFIRMED` | `{ words: [{ text, theme? }] }` | Irreversível. Recebe todas as palavras do jogador em batch. Para cada word, cria `{ id: crypto.randomUUID(), text, theme, playerIndex: wordInputCurrentIndex }` e adiciona ao `pool`. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. No Modo Temático, cada word inclui `theme: themes[i]` — montado pela tela antes do dispatch. No Modo Normal, `theme: null`. |
 | `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null, color: getColor(N+1) }`. `phase → 'wordInput'`. |
 | `START_GAME` | — | Validação deve passar (ver seção 8.1). Trava o `pool`. `phase → 'roulette'`. |
 
@@ -259,14 +259,14 @@ gameOver
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = time oposto ao roundStartTeam atual`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `phase → 'turnPass'`. |
-| `GAME_OVER` | — | `phase → 'gameOver'`. Limpa `localStorage`. |
+| `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = time oposto ao roundStartTeam atual`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `turnHits = 0`. `phase → 'turnPass'`. |
+| `GAME_OVER` | — | `phase → 'gameOver'`. O reducer não toca o localStorage — side effect tratado pelo `GameContext` (ver seção 12). |
 
 ### Desempate
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `START_TIEBREAKER` | — | `phase → 'tiebreaker'`. |
+| `START_TIEBREAKER` | — | `phase → 'tiebreaker'`. Reseta `tiebreakerFormat: null` — o grupo escolhe o formato a cada nova rodada de desempate. |
 | `SELECT_TIEBREAKER_FORMAT` | `1 \| 2 \| 3 \| 4` | `tiebreakerFormat = payload`. `phase → 'roulette'` (sorteia time que começa). |
 | `RANDOMIZE_TIEBREAKER_FORMAT` | — | `tiebreakerFormat = random(1,4)`. `phase → 'roulette'`. |
 
@@ -380,7 +380,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 - **Modo Temático:** cada campo exibe `themes[i]` como label fixo acima do input — não como placeholder. O label persiste enquanto o jogador digita. Ao disparar `ADD_WORD`, a tela passa `theme: themes[i]` no payload com base no índice do campo.
 - **Auto-foco:** ao entrar na tela, foco vai para o primeiro campo vazio. Após confirmar cada palavra (Enter ou blur), foco avança para o próximo campo vazio. Se todos preenchidos, foco vai para o botão de confirmar.
 - Botão "Confirmar" só fica habilitado quando **todos** os campos estiverem preenchidos e o time estiver selecionado.
-- Ao confirmar: dispara `PLAYER_CONFIRMED`. `phase → 'wordInputPass'`.
+- Ao confirmar: a tela monta o array de words em batch — `fields.map((text, i) => ({ text, theme: mode === 'themed' ? themes[i] : null }))` — e dispara `PLAYER_CONFIRMED` com esse payload. `phase → 'wordInputPass'`.
 
 ### WordInputPassScreen
 - Tela de bloqueio que oculta completamente o que o jogador anterior digitou.
@@ -406,6 +406,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 ### TurnScreen
 - Exibe `WordCard` com o texto de `currentWord` na cor `PLAYER_COLORS[currentWord.playerIndex]`.
 - Exibe `Timer` em contagem regressiva a partir de `turnDuration`.
+- Exibe `RoundBadge` com as regras da rodada ativa: usa `ROUNDS[tiebreakerFormat]` quando `tiebreakerFormat !== null`, e `ROUNDS[round]` nos demais casos.
 - Botão "✅ Acertou" → dispara `HIT`.
 - Botão "⏭️ Pular" → dispara `SKIP`.
 - Quando o timer zera: `useTimer` dispara `END_TURN` automaticamente.
@@ -420,6 +421,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 - Exibe mensagem de empate com placar.
 - Botão "Sortear formato" → dispara `RANDOMIZE_TIEBREAKER_FORMAT`.
 - Quatro botões de formato (Livre, Uma Palavra, Mímica, Som) → cada um dispara `SELECT_TIEBREAKER_FORMAT` com o valor correspondente (1, 2, 3, 4).
+- Botão "Aceitar Empate" → dispara `GAME_OVER` diretamente. Encerra o jogo com resultado de empate sem jogar mais.
 
 ### ResultsScreen
 - Exibe placar final de ambos os times.
@@ -516,10 +518,14 @@ Duas responsabilidades distintas, em lugares distintos:
 **`GameContext.jsx` — save contínuo:**
 ```javascript
 useEffect(() => {
-  save(state)
+  if (state.phase === 'gameOver') {
+    clear()  // limpa storage ao encerrar — não salva o estado final
+  } else {
+    save(state)
+  }
 }, [state])
 ```
-Roda após cada render onde `state` mudou. Garante que o localStorage está sempre sincronizado com o estado atual sem violar a pureza do reducer.
+Roda após cada render onde `state` mudou. Mantém o localStorage sincronizado sem violar a pureza do reducer. O reducer nunca chama `clear()` ou `save()` diretamente.
 
 **`App.jsx` — load único na inicialização:**
 ```javascript
