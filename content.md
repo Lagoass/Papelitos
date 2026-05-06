@@ -71,7 +71,8 @@ papelito/
 │   ├── utils/
 │   │   ├── shuffle.js              → Fisher-Yates shuffle
 │   │   ├── colors.js               → paleta PLAYER_COLORS + getColor(playerIndex)
-│   │   └── storage.js              → chave e serialização do localStorage
+│   │   └── storage.js              → exporta STORAGE_KEY + funções serialize/deserialize
+│   │                                  (useLocalStorage.js consome este arquivo — não duplicar lógica)
 │   │
 │   ├── App.jsx                     → renderiza a screen correta baseado em state.phase
 │   └── main.jsx                    → monta o app no #root, envolve com GameProvider
@@ -236,7 +237,7 @@ gameOver
 | `SET_PLAYER_TEAM` | `'A' \| 'B'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. |
 | `ADD_WORD` | `{ text, theme? }` | Cria uma `Word` com `id = crypto.randomUUID()`, `playerIndex = wordInputCurrentIndex`. No Modo Temático, `theme` é passado pela tela com base no índice do campo (`themes[i]`). Adiciona ao `pool`. |
 | `PLAYER_CONFIRMED` | — | Irreversível. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. |
-| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex`. Cria o próximo slot em `players[]`: `{ index: wordInputCurrentIndex, teamId: null, color: getColor(wordInputCurrentIndex) }`. `phase → 'wordInput'`. |
+| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null, color: getColor(N+1) }`. `phase → 'wordInput'`. |
 | `START_GAME` | — | Validação deve passar (ver seção 8.1). Trava o `pool`. `phase → 'roulette'`. |
 
 ### Roulette e Início
@@ -287,18 +288,23 @@ O botão "Iniciar Jogo" só é **renderizado** na `WordInputPassScreen` quando e
 Após cada `HIT`, verificar na seguinte ordem:
 
 ```javascript
+// Dentro do case HIT do reducer — após remover currentWord da queue:
 if (queue.length === 0) {
   if (round === 4) {
     if (teams.A.score === teams.B.score) {
-      dispatch('START_TIEBREAKER')
+      return { ...state, phase: 'tiebreaker', currentWord: null }
     } else {
-      dispatch('GAME_OVER')
+      return { ...state, phase: 'gameOver', currentWord: null }
     }
   } else {
-    phase → 'roundTransition'
+    return { ...state, phase: 'roundTransition', currentWord: null }
   }
 }
+// Se queue ainda tem palavras, apenas avança:
+return { ...state, queue, currentWord: queue[0] }
 ```
+
+O reducer nunca chama `dispatch`. Ele recebe estado e action, e retorna novo estado diretamente. Toda transição de fase acontece via `return`.
 
 ### 8.3 Imutabilidade do Pool e Distinção Round vs Turno
 
@@ -370,6 +376,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 - Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `PLAYER_COLORS[wordInputCurrentIndex]`.
 - Toggle/seletor de time (A ou B) — obrigatório antes de liberar os campos de palavra.
 - Campos de texto: exatamente `wordsPerPlayer` campos.
+- **Edição livre:** todos os campos permanecem editáveis até o clique em Confirmar. O jogador pode alterar qualquer palavra quantas vezes quiser enquanto o dispositivo estiver com ele. Confirmar é a única ação que torna as palavras permanentes.
 - **Modo Temático:** cada campo exibe `themes[i]` como label fixo acima do input — não como placeholder. O label persiste enquanto o jogador digita. Ao disparar `ADD_WORD`, a tela passa `theme: themes[i]` no payload com base no índice do campo.
 - **Auto-foco:** ao entrar na tela, foco vai para o primeiro campo vazio. Após confirmar cada palavra (Enter ou blur), foco avança para o próximo campo vazio. Se todos preenchidos, foco vai para o botão de confirmar.
 - Botão "Confirmar" só fica habilitado quando **todos** os campos estiverem preenchidos e o time estiver selecionado.
@@ -499,9 +506,10 @@ const { isActive } = useWakeLock(enabled: boolean)
 ```javascript
 const { save, load, clear } = useLocalStorage(key: string)
 ```
-- `save(state)` → serializa e persiste o `GameState` completo.
-- `load()` → desserializa e retorna o estado ou `null` se não existir.
-- `clear()` → remove a chave.
+- Consome `STORAGE_KEY`, `serialize` e `deserialize` de `utils/storage.js` — não reimplementa serialização.
+- `save(state)` → chama `serialize(state)` e persiste no localStorage.
+- `load()` → lê do localStorage, chama `deserialize()` e retorna o estado ou `null` se não existir.
+- `clear()` → remove a chave do localStorage.
 
 Duas responsabilidades distintas, em lugares distintos:
 
