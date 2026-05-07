@@ -7,35 +7,37 @@ Este documento registra o progresso da implementação fase a fase. É atualizad
 ## Fase 1 — Esqueleto e Configuração
 
 **Status:** `[ ] Pendente` `[ ] Em andamento` `[x] Concluída`
-**Data de conclusão:** —
+**Data de conclusão:** 2026-05-06
 
 ### O que foi implementado
-- [ ] Estrutura de pastas completa
-- [ ] `package.json` com dependências
-- [ ] `vite.config.js` com vite-plugin-pwa configurado
-- [ ] `tailwind.config.js` + `postcss.config.js`
-- [ ] `index.html`
-- [ ] `public/_redirects`
-- [ ] `public/icons/` (placeholders)
-- [ ] `initialState.js`
-- [ ] `utils/colors.js` — paleta + `getColor()`
-- [ ] `utils/shuffle.js` — Fisher-Yates
-- [ ] `utils/storage.js` — `STORAGE_KEY` + `serialize`/`deserialize`
-- [ ] `store/gameReducer.js` — estrutura base (sem lógica ainda)
-- [ ] `store/GameContext.jsx` — estrutura base
-- [ ] `App.jsx` — estrutura base (renderiza setup por padrão)
-- [ ] `main.jsx`
-- [ ] Projeto abre no browser sem erros
+- [x] Estrutura de pastas completa (screens, components, hooks, store, utils + subdiretórios)
+- [x] `package.json` com dependências (React 18, Vite 5, Tailwind 3, vite-plugin-pwa)
+- [x] `vite.config.js` com vite-plugin-pwa configurado conforme seção 14
+- [x] `tailwind.config.js` + `postcss.config.js`
+- [x] `index.html` (viewport com user-scalable=no para mobile)
+- [x] `public/_redirects` com `/* /index.html 200`
+- [x] `public/icons/` (diretório criado — ícones reais serão adicionados antes do deploy)
+- [x] `src/store/initialState.js` conforme seção 5
+- [x] `src/utils/colors.js` — paleta PLAYER_COLORS + getColor()
+- [x] `src/utils/shuffle.js` — Fisher-Yates (cria cópia do array antes de shuffle)
+- [x] `src/utils/storage.js` — STORAGE_KEY + serialize/deserialize
+- [x] `src/store/gameReducer.js` — estrutura base com todos os cases declarados retornando state; RESET_GAME retorna initialState, LOAD_GAME retorna payload
+- [x] `src/store/GameContext.jsx` — Context + Provider com useReducer + hook useGame()
+- [x] `src/App.jsx` — renderiza SetupScreen placeholder via useGame
+- [x] `src/main.jsx` — monta app no #root, envolve com GameProvider
+- [x] `src/index.css` — diretivas Tailwind (@tailwind base/components/utilities)
 
 ### Decisões tomadas fora do content.md
-*(Registrar aqui qualquer decisão que o agente tomou por conta própria durante a implementação — bibliotecas extras, estruturas alternativas, ajustes de configuração, etc.)*
-—
+- `src/index.css` criado com as diretivas Tailwind (necessário para Tailwind funcionar com Vite, não mencionado explicitamente na seção 3 mas obrigatório).
+- `user-scalable=no` no viewport do `index.html` — padrão para PWA mobile que evita zoom acidental durante o jogo.
+- `useGame()` exportado do `GameContext.jsx` — não mencionado explicitamente no content.md mas implícito pelo uso nas telas.
+- `RESET_GAME` e `LOAD_GAME` já implementados no reducer (lógica trivial — retornam initialState e payload respectivamente) mesmo sendo Fase 1.
 
 ### Problemas encontrados e como foram resolvidos
-—
+- Nenhum problema encontrado. Projeto está pronto para `npm install` seguido de `npm run dev`.
 
 ### Estado atual
-—
+Fase 1 concluída. Estrutura completa criada. Próximo passo: implementar a lógica completa de todas as actions no `gameReducer.js` e os hooks (Fase 2).
 
 ---
 
