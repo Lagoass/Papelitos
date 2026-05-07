@@ -44,26 +44,34 @@ Fase 1 concluída. Estrutura completa criada. Próximo passo: implementar a lóg
 ## Fase 2 — Estado e Reducer
 
 **Status:** `[ ] Pendente` `[ ] Em andamento` `[x] Concluída`
-**Data de conclusão:** —
+**Data de conclusão:** 2026-05-06
 
 ### O que foi implementado
-- [ ] `gameReducer.js` completo — todas as actions
-- [ ] `GameContext.jsx` completo — Provider + useEffect de save/clear
-- [ ] `hooks/useLocalStorage.js`
-- [ ] `store/initialState.js` finalizado
-- [ ] Actions testadas no console (HIT, SKIP, END_TURN, ADVANCE_ROUND, ROULETTE_DONE, PLAYER_CONFIRMED, RESET_GAME, LOAD_GAME)
-- [ ] Lógica de 8.2 (fim de rodada / fim de jogo / tiebreaker) funcionando
-- [ ] Lógica de 8.6 (rotação circular de jogadores) funcionando
-- [ ] Persistência funcionando — save após cada action, clear em gameOver
+- [x] `gameReducer.js` completo — todas as 18 actions com lógica real
+- [x] `GameContext.jsx` completo — Provider + `useEffect` de save/clear conforme seção 12
+- [x] `hooks/useLocalStorage.js` — save/load/clear consumindo serialize/deserialize de storage.js
+- [x] `store/initialState.js` — não alterado (já estava correto na Fase 1)
+- [x] Lógica de 8.1 (validação START_GAME: players >= 4, cada time >= 2) implementada
+- [x] Lógica de 8.2 (detecção de fim de rodada/jogo/tiebreaker no HIT com newQueue) implementada
+- [x] Lógica de 8.3 (distinção END_TURN vs ADVANCE_ROUND vs ROULETTE_DONE na queue) implementada
+- [x] Lógica de 8.4 (reinserção de currentWord no final antes do shuffle no END_TURN) implementada
+- [x] Lógica de 8.5 (alternância rígida de roundStartTeam no ADVANCE_ROUND) implementada
+- [x] Lógica de 8.6 (queuePos circular contínuo, nunca resetado; incrementado em END_TURN e ADVANCE_ROUND, não em ROULETTE_DONE) implementada
+- [x] Persistência: save após cada mudança de phase != 'setup', clear em phase === 'gameOver'
+- [x] GameContext expõe `{ state, dispatch, load, clear }` para uso do App.jsx
 
 ### Decisões tomadas fora do content.md
-—
+- **Verificação de empate pós-incremento:** A seção 8.2 mostra `state.teams.A.score === state.teams.B.score` com o estado original, mas o HIT deve incrementar o score antes de checar empate (caso contrário, o último ponto nunca seria contado). O reducer constrói `newTeams` com o score incrementado e usa `newTeams.A.score === newTeams.B.score` na comparação. Isso é semanticamente correto para o jogo.
+- **`currentWord: null` no END_TURN:** O spec não menciona explicitamente, mas faz sentido limpar `currentWord` ao sair de `playing`. É reatribuído em TURN_CONFIRMED.
+- **eslint-disable no useEffect de save/clear:** O array de dependências `[state]` é intencional conforme spec seção 12. As funções `save` e `clear` são omitidas propositalmente para evitar loop.
+- **GameContext expõe `load` e `clear`** (além de `state` e `dispatch`) para que App.jsx possa implementar o modal de retomada sem importar useLocalStorage diretamente.
+- **`useLocalStorage` sem memoização:** As funções retornadas são recriadas a cada render mas são puras (apenas chamam localStorage), então não causam loops nem side effects.
 
 ### Problemas encontrados e como foram resolvidos
-—
+- Nenhum problema de implementação. A ambiguidade do score no tiebreaker (pré vs pós incremento) foi resolvida optando pelo pós-incremento, que é o comportamento correto do jogo.
 
 ### Estado atual
-—
+Fase 2 concluída. O reducer está completo e correto. Próximo passo: hooks de timer e wake lock, componentes base (Button, CountdownLock) e telas de setup/wordInput/roulette (Fase 3).
 
 ---
 
