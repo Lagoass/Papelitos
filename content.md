@@ -81,7 +81,9 @@ papelito/
 ├── vite.config.js                  → configuração do Vite + vite-plugin-pwa
 ├── tailwind.config.js
 ├── postcss.config.js
-└── package.json
+├── package.json
+├── content.md                      → especificação técnica completa do projeto (fonte de verdade para o agente)
+└── rules.md                        → regras oficiais do jogo (referência humana)
 ```
 
 ---
