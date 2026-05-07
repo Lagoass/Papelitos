@@ -83,7 +83,8 @@ papelito/
 ├── postcss.config.js
 ├── package.json
 ├── content.md                      → especificação técnica completa do projeto (fonte de verdade para o agente)
-└── rules.md                        → regras oficiais do jogo (referência humana)
+├── rules.md                        → regras oficiais do jogo (referência humana)
+└── progress.md                     → log de progresso por fase — enviar junto com content.md em cada sessão
 ```
 
 ---
