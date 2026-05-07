@@ -56,7 +56,7 @@ papelito/
 │   │   ├── ScoreBoard/             → placar em tempo real dos dois times
 │   │   ├── RoundBadge/             → ícone + nome da rodada atual
 │   │   ├── Button/                 → botão padrão reutilizável
-│   │   └── CountdownLock/          → botão com travamento regressivo de N segundos
+│   │   └── CountdownLock/          → botão com travamento regressivo. Recebe `seconds: number` como prop (padrão: `5`). Usado com `seconds={5}` em todos os contextos atuais.
 │   │
 │   ├── store/
 │   │   ├── GameContext.jsx         → Context + Provider que envolve o app
@@ -224,7 +224,7 @@ gameOver
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `SET_MODE` | `'normal' \| 'themed'` | Atualiza `mode`. Se themed, zera `wordsPerPlayer` (será derivado de `themes.length`). |
+| `SET_MODE` | `'normal' \| 'themed'` | Atualiza `mode`. Ao trocar para `normal`: reseta `themes: []` e `wordsPerPlayer: 5`. Ao trocar para `themed`: reseta `themes: []` e `wordsPerPlayer: 0` (será derivado de `themes.length` conforme temas forem adicionados). |
 | `SET_TURN_DURATION` | `number` | Atualiza `turnDuration`. |
 | `SET_WORDS_PER_PLAYER` | `number` | Só válido no Modo Normal. |
 | `ADD_THEME` | `string` | Adiciona ao array `themes`. `wordsPerPlayer` passa a ser `themes.length`. |
@@ -252,7 +252,7 @@ gameOver
 |--------|---------|---------------|
 | `TURN_CONFIRMED` | — | `currentWord = queue[0]`. `phase → 'playing'`. |
 | `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue` filtrando por id: `queue.filter(w => w.id !== currentWord.id)`. Verifica se `queue.length === 0` (ver seção 8.2). Caso contrário: `currentWord = queue[0]`. |
-| `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. |
+| `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. Se `queue.length === 1`, `currentWord` permanece o mesmo objeto — comportamento esperado. O jogador só pode sair dessa situação via `END_TURN`. |
 | `END_TURN` | — | Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. Alterna `currentTeamId`. `turnHits = 0`. `phase → 'turnPass'`. |
 
 ### Rodada
@@ -262,6 +262,7 @@ gameOver
 | `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = time oposto ao roundStartTeam atual`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `turnHits = 0`. `phase → 'turnPass'`. |
 | `GAME_OVER` | — | `phase → 'gameOver'`. O reducer não toca o localStorage — side effect tratado pelo `GameContext` (ver seção 12). |
 | `RESET_GAME` | — | Retorna `initialState` diretamente. Disparado pelo `ResultsScreen` ao confirmar "Nova Partida". O localStorage já foi limpo pelo `GameContext` quando `phase` virou `'gameOver'`. |
+| `LOAD_GAME` | `GameState` | Retorna o payload diretamente como novo estado. Disparado pelo `App.jsx` ao confirmar retomada de partida salva. |
 
 ### Desempate
 
@@ -289,19 +290,21 @@ Após cada `HIT`, verificar na seguinte ordem:
 
 ```javascript
 // Dentro do case HIT do reducer — após remover currentWord da queue:
-if (queue.length === 0) {
-  if (round === 4) {
-    if (teams.A.score === teams.B.score) {
-      return { ...state, phase: 'tiebreaker', currentWord: null, tiebreakerFormat: null }
+const newQueue = state.queue.filter(w => w.id !== state.currentWord.id)
+
+if (newQueue.length === 0) {
+  if (state.round === 4) {
+    if (state.teams.A.score === state.teams.B.score) {
+      return { ...state, queue: newQueue, phase: 'tiebreaker', currentWord: null, tiebreakerFormat: null }
     } else {
-      return { ...state, phase: 'gameOver', currentWord: null }
+      return { ...state, queue: newQueue, phase: 'gameOver', currentWord: null }
     }
   } else {
-    return { ...state, phase: 'roundTransition', currentWord: null }
+    return { ...state, queue: newQueue, phase: 'roundTransition', currentWord: null }
   }
 }
 // Se queue ainda tem palavras, apenas avança:
-return { ...state, queue, currentWord: queue[0] }
+return { ...state, queue: newQueue, currentWord: newQueue[0] }
 ```
 
 O reducer nunca chama `dispatch`. Ele recebe estado e action, e retorna novo estado diretamente. Toda transição de fase acontece via `return`. O reset de `tiebreakerFormat: null` ocorre aqui — não via `START_TIEBREAKER`.
@@ -355,7 +358,7 @@ const currentPlayer = (team) => {
 
 O timer é responsabilidade exclusiva de `useTimer`. O reducer não sabe que o tempo acabou. Quando o timer chega a zero, o hook dispara `END_TURN`. O reducer responde à action, não ao evento de tempo.
 
-O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFIRMED`). Tempo restante de turnos anteriores não acumula nem transfere.
+O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remonta a cada transição de fase. O `start()` chamado no `useEffect` de montagem garante sempre o tempo cheio — não há reset explícito necessário em `TURN_CONFIRMED`. Tempo restante de turnos anteriores não acumula nem transfere.
 
 ### 8.8 Irreversibilidade da Confirmação de Palavras
 
@@ -373,7 +376,7 @@ O timer é sempre reiniciado integralmente no início de cada turno (`TURN_CONFI
 - Botão "Continuar" dispara `SETUP_COMPLETE`.
 
 ### WordInputScreen
-- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `getColor(wordInputCurrentIndex)`.
+- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `getColor(wordInputCurrentIndex)`. Este `wordInputCurrentIndex` é o `playerIndex` permanente desse jogador — o mesmo valor usado em todas as `Word` que ele criar e em qualquer chamada futura a `getColor()` para exibir sua cor.
 - Toggle/seletor de time (A ou B) — obrigatório antes de liberar os campos de palavra.
 - Campos de texto: exatamente `wordsPerPlayer` campos.
 - **Edição livre:** todos os campos permanecem editáveis até o clique em Confirmar. O jogador pode alterar qualquer palavra quantas vezes quiser enquanto o dispositivo estiver com ele. Confirmar é a única ação que torna as palavras permanentes.
@@ -522,8 +525,8 @@ Duas responsabilidades distintas, em lugares distintos:
 useEffect(() => {
   if (state.phase === 'gameOver') {
     clear()  // limpa storage ao encerrar — não salva o estado final
-  } else {
-    save(state)
+  } else if (state.phase !== 'setup') {
+    save(state)  // nunca salva o estado inicial — evita sobrescrever partida salva na montagem
   }
 }, [state])
 ```
@@ -534,7 +537,9 @@ Roda após cada render onde `state` mudou. Mantém o localStorage sincronizado s
 useEffect(() => {
   const saved = load()
   if (saved && saved.phase !== 'setup' && saved.phase !== 'gameOver') {
-    // exibe modal de retomada
+    // exibe modal de retomada com duas opções:
+    // "Retomar" → dispatch({ type: 'LOAD_GAME', payload: saved })
+    // "Nova Partida" → clear() + permanece em setup (com CountdownLock de 5s)
   }
 }, []) // array vazio → roda apenas uma vez, na montagem
 ```
