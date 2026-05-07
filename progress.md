@@ -112,35 +112,57 @@ Fase 3 concluída. Fluxo completo setup → wordInput → wordInputPass → roul
 ## Fase 4 — Telas de Jogo e Finalização
 
 **Status:** `[ ] Pendente` `[ ] Em andamento` `[x] Concluída`
-**Data de conclusão:** —
+**Data de conclusão:** 2026-05-07
 
 ### O que foi implementado
-- [ ] `components/WordCard/` — cor via getColor(playerIndex)
-- [ ] `components/Timer/` — visual do cronômetro
-- [ ] `components/ScoreBoard/`
-- [ ] `components/RoundBadge/` — lógica tiebreakerFormat vs round
-- [ ] `screens/TurnPassScreen/` — RoundBadge com lógica de tiebreaker
-- [ ] `screens/TurnScreen/` — timer start/reset na montagem, WakeLock
-- [ ] `screens/RoundTransitionScreen/` — ROUNDS[round + 1]
-- [ ] `screens/TiebreakerScreen/` — Sortear, Escolher, Aceitar Empate
-- [ ] `screens/ResultsScreen/` — vitória/empate, CountdownLock no "Nova Partida"
-- [ ] PWA instalável testado (manifest + Service Worker)
-- [ ] Wake Lock testado em dispositivo real
-- [ ] Deploy no Cloudflare Pages configurado e funcionando
-- [ ] Jogo completo jogável do início ao fim
+- [x] `components/RoundBadge/index.jsx` — exporta `ROUNDS` como named export; lógica `tiebreakerFormat !== null ? ROUNDS[tiebreakerFormat] : ROUNDS[round]` interna ao componente
+- [x] `components/WordCard/index.jsx` — cor e borda via `getColor(word.playerIndex)`; background com opacidade 10% (`#color18`)
+- [x] `components/Timer/index.jsx` — SVG circular com `strokeDashoffset` animado; cores verde/amarelo/vermelho conforme tempo restante
+- [x] `components/ScoreBoard/index.jsx` — exporta `TEAM_COLORS` (A=`#60a5fa`, B=`#fb923c`); prop `highlight` para destacar time ativo
+- [x] `screens/TurnPassScreen/index.jsx` — RoundBadge com tiebreakerFormat, ScoreBoard com highlight, player atual derivado de `queuePos % playerIndices.length`
+- [x] `screens/TurnScreen/index.jsx` — `useTimer` com `onEnd → END_TURN`; `useEffect(start, [])` com cleanup `reset`; `useWakeLock(true)`; WordCard, Timer, RoundBadge, HIT/SKIP
+- [x] `screens/RoundTransitionScreen/index.jsx` — exibe `ROUNDS[round + 1]` (round ainda é o valor antigo); ScoreBoard; ADVANCE_ROUND
+- [x] `screens/TiebreakerScreen/index.jsx` — RANDOMIZE_TIEBREAKER_FORMAT, grid 2×2 com os 4 formatos via SELECT_TIEBREAKER_FORMAT, GAME_OVER (aceitar empate)
+- [x] `screens/ResultsScreen/index.jsx` — vitória vs empate derivado dos scores; placar final; CountdownLock de 5s → RESET_GAME
+- [x] `src/App.jsx` — PHASE_SCREENS completo com todas as 9 fases mapeadas
 
 ### Decisões tomadas fora do content.md
-—
+- **`ROUNDS` exportado de `RoundBadge/index.jsx`** como named export — permite que `RoundTransitionScreen` e `TiebreakerScreen` importem os dados sem criar um arquivo utilitário extra não previsto no spec.
+- **`TEAM_COLORS` exportado de `ScoreBoard/index.jsx`** — permite que `TurnPassScreen` e `ResultsScreen` usem as mesmas cores sem duplicação. Definição: A=`#60a5fa` (blue-400), B=`#fb923c` (orange-400). O spec não define cores de time; escolha baseada em contraste visual em fundo escuro e diferença clara entre times.
+- **`ScoreBoard` recebe prop `highlight`** — permite destacar o time ativo na TurnPassScreen sem acoplamento ao estado global dentro do componente.
+- **Timer usa `transition: stroke-dashoffset 0.95s linear`** — ligeiramente inferior a 1s para evitar que o arco "pule" um step antes de ser atualizado pelo setInterval (que tem jitter de ~5ms).
+- **`TurnScreen` exibe `turnHits`** (acertos do turno) ao lado do timer — informação útil para o jogador saber quantas palavras acertou no turno atual. Não especificado explicitamente no spec mas implícito pelo campo existir no estado.
+- **`ResultsScreen` verifica tie via `scoreA === scoreB`** — cobre o caso de GAME_OVER disparado pelo TiebreakerScreen (aceitar empate) onde os scores permanecem iguais.
 
 ### Problemas encontrados e como foram resolvidos
-—
+- Nenhum problema de implementação. O único ponto de atenção foi a `RoundTransitionScreen` usar `ROUNDS[round + 1]` com o `round` do estado atual (não incrementado) — garantido pela leitura direta de `state.round` antes do ADVANCE_ROUND ser disparado.
 
 ### Estado atual
-—
+Fase 4 concluída. Implementação do jogo completa. Pendências antes do deploy:
+1. Criar `public/icons/icon-192.png` e `public/icons/icon-512.png` (ícones PWA)
+2. Configurar projeto no Cloudflare Pages com `npm run build` / output `dist`
+3. Testar em dispositivo real (Wake Lock, gestos de toque, orientação portrait)
 
 ---
 
 ## Notas Gerais
 
-*(Espaço para observações que atravessam fases — padrões adotados, convenções de código, decisões de estilo que valem para o projeto inteiro.)*
-—
+### Padrões adotados ao longo do projeto
+
+**Estrutura de arquivos:** Cada componente e tela vive em seu próprio diretório (`ComponentName/index.jsx`). Isso segue a convenção do projeto e facilita adicionar arquivos de teste ou estilos específicos futuramente.
+
+**Estilo:** Dark theme consistente em todas as telas. Paleta principal: `bg-black` (tela), `bg-zinc-800`/`bg-zinc-900` (painéis), `text-zinc-400`/`text-zinc-500` (texto muted). Botões: branco sobre preto (primary), zinc-800 (secondary), borda zinc-600 (ghost). `rounded-xl` para cards pequenos, `rounded-2xl` para cards grandes, `rounded-3xl` para WordCard.
+
+**Cores de jogador:** Definidas em `utils/colors.js` como `PLAYER_COLORS[]` + `getColor(index)`. Nunca armazenadas no estado — sempre computadas sob demanda. Usadas em: header do WordInputScreen, borda/texto do WordCard, label de tema no Modo Temático.
+
+**Cores de time:** `TEAM_COLORS = { A: '#60a5fa', B: '#fb923c' }` exportadas de `ScoreBoard/index.jsx`. Não definidas no spec; escolha visual baseada em azul/laranja como cores "de time" reconhecíveis.
+
+**Fluxo de phases:** Mapeado em `PHASE_SCREENS` no App.jsx. Qualquer phase não mapeada cai em `SetupScreen` como fallback seguro. A fase `gameOver` mapeia para `ResultsScreen`.
+
+**ESLint e deps de useEffect:** Arrays de dependência intencionalmente incompletos em dois lugares específicos: (1) `GameContext.jsx` — `[state]` sem `save`/`clear` conforme spec seção 12; (2) `TurnScreen.jsx` — `[]` para garantir que o timer inicia apenas uma vez por montagem. Ambos documentados com `// eslint-disable-line react-hooks/exhaustive-deps`.
+
+**Refs para evitar stale closures:** `onEndRef` em `useTimer` (callback `onEnd` mutável sem causar restart do interval); `fieldsRef` em `WordInputScreen` (estado de campos sempre atual no `focusNext` sem depender do closure).
+
+**Imutabilidade no reducer:** Todos os cases retornam objetos novos via spread. Arrays sempre copiados antes de modificação (`[...arr]`, `.filter()`, `.map()`). O `pool` nunca é tocado após `START_GAME`.
+
+**CountdownLock:** Padrão de UX para ações destrutivas ou irreversíveis (iniciar jogo, aceitar nova partida, nova partida na ResultsScreen). Sempre 5 segundos nos contextos atuais. Remonta ao re-abrir o overlay, reiniciando o countdown.

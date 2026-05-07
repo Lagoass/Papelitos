@@ -4,6 +4,11 @@ import SetupScreen from './screens/SetupScreen/index.jsx'
 import WordInputScreen from './screens/WordInputScreen/index.jsx'
 import WordInputPassScreen from './screens/WordInputPassScreen/index.jsx'
 import RouletteScreen from './screens/RouletteScreen/index.jsx'
+import TurnPassScreen from './screens/TurnPassScreen/index.jsx'
+import TurnScreen from './screens/TurnScreen/index.jsx'
+import RoundTransitionScreen from './screens/RoundTransitionScreen/index.jsx'
+import TiebreakerScreen from './screens/TiebreakerScreen/index.jsx'
+import ResultsScreen from './screens/ResultsScreen/index.jsx'
 import Button from './components/Button/index.jsx'
 import CountdownLock from './components/CountdownLock/index.jsx'
 
@@ -23,10 +28,15 @@ const ResumeModal = ({ savedPhase, onResume, onNew }) => (
 )
 
 const PHASE_SCREENS = {
-  setup:         SetupScreen,
-  wordInput:     WordInputScreen,
-  wordInputPass: WordInputPassScreen,
-  roulette:      RouletteScreen,
+  setup:           SetupScreen,
+  wordInput:       WordInputScreen,
+  wordInputPass:   WordInputPassScreen,
+  roulette:        RouletteScreen,
+  turnPass:        TurnPassScreen,
+  playing:         TurnScreen,
+  roundTransition: RoundTransitionScreen,
+  tiebreaker:      TiebreakerScreen,
+  gameOver:        ResultsScreen,
 }
 
 const App = () => {
