@@ -78,28 +78,34 @@ Fase 2 concluída. O reducer está completo e correto. Próximo passo: hooks de 
 ## Fase 3 — Hooks e Telas de Setup
 
 **Status:** `[ ] Pendente` `[ ] Em andamento` `[x] Concluída`
-**Data de conclusão:** —
+**Data de conclusão:** 2026-05-06
 
 ### O que foi implementado
-- [ ] `hooks/useTimer.js` — start, pause, reset, onEnd
-- [ ] `hooks/useWakeLock.js`
-- [ ] `components/Button/`
-- [ ] `components/CountdownLock/` — prop `seconds` com padrão 5
-- [ ] `screens/SetupScreen/` — valores padrão preenchidos (5 palavras, 60s)
-- [ ] `screens/WordInputScreen/` — seleção de time, batch confirm, auto-foco, labels temáticos
-- [ ] `screens/WordInputPassScreen/` — bloqueio, botão condicional "Iniciar Jogo" com CountdownLock
-- [ ] `screens/RouletteScreen/` — sorteio local + animação + ROULETTE_DONE
-- [ ] Fluxo setup → wordInput → wordInputPass → roulette validado de ponta a ponta
-- [ ] Modal de retomada no App.jsx funcionando (LOAD_GAME)
+- [x] `hooks/useTimer.js` — setInterval com start/pause/reset/onEnd; onEnd via ref para evitar stale closure; cleanup no unmount
+- [x] `hooks/useWakeLock.js` — acquire/release com graceful fallback para browsers sem suporte
+- [x] `components/Button/index.jsx` — forwardRef, 4 variantes (primary/secondary/danger/ghost)
+- [x] `components/CountdownLock/index.jsx` — countdown regressivo via setTimeout encadeado, prop `seconds` com padrão 5, botão travado enquanto remaining > 0
+- [x] `screens/SetupScreen/index.jsx` — seletor Normal/Temático, campos com valores do initialState (não placeholders), add/remove temas no Modo Temático, botão Continuar desabilitado se temático sem temas
+- [x] `screens/WordInputScreen/index.jsx` — header com cor do jogador, seletor de time, campos de palavra com fieldsRef para auto-foco correto, labels fixos de tema no Modo Temático, batch PLAYER_CONFIRMED
+- [x] `screens/WordInputPassScreen/index.jsx` — bloqueio, contador de jogadores por time, botão "Iniciar Jogo" renderizado condicionalmente (players >= 4, cada time >= 2), overlay de confirmação com CountdownLock de 5s
+- [x] `screens/RouletteScreen/index.jsx` — winner gerado via useRef antes da animação, spin delays decrescentes (slot machine), setCurrent(winner) forçado ao final, ROULETTE_DONE após 1.4s de pausa
+- [x] `src/App.jsx` — roteamento por PHASE_SCREENS map, useEffect([]) para load único, modal de retomada com CountdownLock de 5s no "Nova partida"
 
 ### Decisões tomadas fora do content.md
-—
+- **`Button` com `forwardRef`:** necessário para que `WordInputScreen` possa dar foco programático ao botão Confirmar via `confirmRef.current?.focus()`.
+- **`fieldsRef` em `WordInputScreen`:** ref mutável espelhando o state `fields` — necessário para que `focusNext` não capture valores stale do closure quando chamado do `onBlur` (que dispara antes do re-render com o novo state).
+- **Roteamento via `PHASE_SCREENS` map em `App.jsx`:** mais limpo que switch; fases não implementadas (turnPass, playing, etc.) caem no `?? SetupScreen` como fallback temporário.
+- **Modal de retomada usa `savedState !== null` como flag:** evita estado booleano separado; `setSavedState(null)` fecha o modal em ambos os caminhos (retomar e nova partida).
+- **`WordInputPassScreen` exibe `state.pool.length`** na overlay de confirmação — informação útil para o grupo confirmar que todos inseriram palavras.
+- **`SPIN_DELAYS` com 15 frames** na RouletteScreen: equilíbrio entre animação perceptível (~2.6s total) e tempo de espera aceitável para um party game mobile.
+- **Tema como label colorido** (cor do jogador) acima do input no Modo Temático — o spec diz "label fixo acima do input" mas não especifica cor; usamos a cor do jogador atual para consistência visual com o header.
 
 ### Problemas encontrados e como foram resolvidos
-—
+- **Auto-foco stale closure:** `onBlur` disparava antes do re-render causado pelo `onChange`, fazendo `focusNext` ler `fields` desatualizado. Resolvido com `fieldsRef` que é atualizado sincronamente dentro do `setFields` updater function.
+- **`CountdownLock` com `onClick={undefined}`** enquanto bloqueado — intencional; o `disabled={true}` já impede interação, mas garantir `onClick={undefined}` evita qualquer handler acidental.
 
 ### Estado atual
-—
+Fase 3 concluída. Fluxo completo setup → wordInput → wordInputPass → roulette → turnPass funcional. App.jsx com modal de retomada operacional. Próximo passo: componentes visuais (WordCard, Timer, ScoreBoard, RoundBadge) e telas de jogo (TurnPassScreen, TurnScreen, RoundTransitionScreen, TiebreakerScreen, ResultsScreen) — Fase 4.
 
 ---
 
