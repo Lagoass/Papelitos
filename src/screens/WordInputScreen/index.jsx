@@ -10,6 +10,7 @@ const WordInputScreen = () => {
 
   const [fields, setFields] = useState(() => Array(wordsPerPlayer).fill(''))
   const [teamId, setTeamId] = useState(null)
+  const [name, setName] = useState('')
 
   const inputRefs = useRef([])
   const confirmRef = useRef(null)
@@ -52,6 +53,11 @@ const WordInputScreen = () => {
     if (fieldsRef.current[i].trim() !== '') focusNext(i)
   }
 
+  const handleNameChange = (value) => {
+    setName(value)
+    dispatch({ type: 'SET_PLAYER_NAME', payload: value })
+  }
+
   const handleTeamSelect = (id) => {
     setTeamId(id)
     dispatch({ type: 'SET_PLAYER_TEAM', payload: id })
@@ -80,6 +86,18 @@ const WordInputScreen = () => {
           Escolha seu time e insira suas {wordsPerPlayer} palavras
         </p>
       </div>
+
+      {/* Nome do jogador */}
+      <section className="mb-6">
+        <p className="text-xs text-zinc-400 uppercase tracking-widest mb-2">Seu nome</p>
+        <input
+          type="text"
+          value={name}
+          onChange={e => handleNameChange(e.target.value)}
+          placeholder={`Jogador ${wordInputCurrentIndex + 1}`}
+          className="w-full bg-zinc-800 text-white py-3 px-4 rounded-xl border border-zinc-600 focus:outline-none text-base"
+        />
+      </section>
 
       {/* Seletor de time */}
       <section className="mb-6">

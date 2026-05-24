@@ -32,11 +32,18 @@ const gameReducer = (state, action) => {
     case 'SETUP_COMPLETE':
       return {
         ...state,
-        players: [{ index: 0, teamId: null }],
+        players: [{ index: 0, teamId: null, name: '' }],
         phase: 'wordInput',
       }
 
     // ── Inserção de palavras ───────────────────────────────────────────────
+
+    case 'SET_PLAYER_NAME': {
+      const newPlayers = state.players.map((p, i) =>
+        i === state.wordInputCurrentIndex ? { ...p, name: action.payload } : p
+      )
+      return { ...state, players: newPlayers }
+    }
 
     case 'SET_PLAYER_TEAM': {
       const newPlayers = state.players.map((p, i) =>
@@ -75,7 +82,7 @@ const gameReducer = (state, action) => {
       return {
         ...state,
         wordInputCurrentIndex: nextIndex,
-        players: [...state.players, { index: nextIndex, teamId: null }],
+        players: [...state.players, { index: nextIndex, teamId: null, name: '' }],
         phase: 'wordInput',
       }
     }

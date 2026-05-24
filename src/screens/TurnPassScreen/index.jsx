@@ -9,10 +9,12 @@ const TurnPassScreen = () => {
   const { state, dispatch } = useGame()
   const { currentTeamId, teams, round, tiebreakerFormat } = state
 
+  const { players } = state
   const team = teams[currentTeamId]
   const currentPlayerIndex = team.playerIndices[team.queuePos % team.playerIndices.length]
   const teamColor = TEAM_COLORS[currentTeamId]
   const playerColor = getColor(currentPlayerIndex)
+  const playerName = players[currentPlayerIndex]?.name?.trim() || `Jogador ${currentPlayerIndex + 1}`
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col p-6 gap-5">
@@ -23,7 +25,7 @@ const TurnPassScreen = () => {
           Time {currentTeamId}
         </p>
         <p className="text-sm mt-2" style={{ color: playerColor }}>
-          Jogador {currentPlayerIndex + 1}
+          {playerName}
         </p>
       </div>
 
