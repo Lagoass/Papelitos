@@ -44,6 +44,7 @@ papelito/
 │   │   ├── WordInputScreen/        → seleção de time + inserção de palavras
 │   │   ├── WordInputPassScreen/    → bloqueio entre jogadores no setup
 │   │   ├── RouletteScreen/         → animação de sorteio do time inicial
+│   │   ├── FormatRouletteScreen/   → animação de sorteio do formato do desempate
 │   │   ├── TurnPassScreen/         → tela de passagem do dispositivo entre turnos
 │   │   ├── TurnScreen/             → palavra ativa + timer + botões Hit/Skip
 │   │   ├── RoundTransitionScreen/  → fim de rodada + exibição da nova regra
@@ -105,6 +106,8 @@ papelito/
 {
   index:  number,            // 0-based. "Jogador N" = index + 1
   teamId: 'A' | 'B' | null, // null até o jogador escolher o time em wordInput
+  name:   string,            // '' por padrão. Preenchido opcionalmente via SET_PLAYER_NAME.
+                             // Fallback para exibição: name.trim() || `Jogador ${index + 1}`
   // cor não é armazenada — sempre derivada via getColor(index) sob demanda (ver seção 11)
 }
 
@@ -127,7 +130,7 @@ const initialState = {
   // Controla qual screen o App.jsx renderiza.
   phase: 'setup',
   // Valores possíveis:
-  // 'setup' | 'wordInput' | 'wordInputPass' | 'roulette' |
+  // 'setup' | 'wordInput' | 'wordInputPass' | 'roulette' | 'formatRoulette' |
   // 'turnPass' | 'playing' | 'roundTransition' | 'tiebreaker' | 'gameOver'
 
   // ── CONFIGURAÇÃO ──────────────────────────────────────────────────────────
@@ -173,6 +176,7 @@ const initialState = {
   round:       1,            // 1 | 2 | 3 | 4
   currentWord: null,         // Word | null — palavra visível na TurnScreen
   turnHits:    0,            // acertos do turno em andamento (para display)
+  turnSkips:   0,            // palavras puladas no turno em andamento — habilita o botão BACK
 
   // ── DESEMPATE ─────────────────────────────────────────────────────────────
   tiebreakerFormat: null,    // 1 | 2 | 3 | 4 — formato sorteado ou escolhido
@@ -212,8 +216,11 @@ roundTransition
 
 tiebreaker
   ├─[SELECT_TIEBREAKER_FORMAT]────────────────────→ roulette (sorteia time) → turnPass
-  ├─[RANDOMIZE_TIEBREAKER_FORMAT]─────────────────→ roulette (sorteia time) → turnPass
+  ├─[RANDOMIZE_TIEBREAKER_FORMAT]─────────────────→ formatRoulette (anima sorteio do formato)
   └─[GAME_OVER] (aceitar empate)──────────────────→ gameOver
+
+formatRoulette
+  └─[FORMAT_ROULETTE_DONE]────────────────────────→ roulette (sorteia time) → turnPass
 
 gameOver
   └─ estado terminal. localStorage limpo via GameContext useEffect (ver seção 12).
@@ -238,6 +245,7 @@ gameOver
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
+| `SET_PLAYER_NAME` | `string` | Atualiza `name` do objeto em `players[wordInputCurrentIndex]`. Disparado a cada keystroke no campo de nome da `WordInputScreen`. |
 | `SET_PLAYER_TEAM` | `'A' \| 'B'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. |
 | `PLAYER_CONFIRMED` | `{ words: [{ text, theme? }] }` | Irreversível. Recebe todas as palavras do jogador em batch. Para cada word, cria `{ id: crypto.randomUUID(), text, theme, playerIndex: wordInputCurrentIndex }` e adiciona ao `pool`. O `teamId` usado é `players[wordInputCurrentIndex].teamId` — atribuído anteriormente via `SET_PLAYER_TEAM`. O botão Confirmar só fica habilitado quando `teamId !== null`, garantindo que nunca seja null aqui. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. No Modo Temático, cada word inclui `theme: themes[i]` — montado pela tela antes do dispatch. No Modo Normal, `theme: null`. |
 | `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null }`. `phase → 'wordInput'`. |
@@ -253,10 +261,11 @@ gameOver
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `TURN_CONFIRMED` | — | `currentWord = queue[0]`. `phase → 'playing'`. |
+| `TURN_CONFIRMED` | — | `currentWord = queue[0]`. `turnSkips = 0`. `phase → 'playing'`. |
 | `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue` filtrando por id: `queue.filter(w => w.id !== currentWord.id)`. Verifica se `queue.length === 0` (ver seção 8.2). Caso contrário: `currentWord = queue[0]`. |
-| `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. Se `queue.length === 1`, `currentWord` permanece o mesmo objeto — comportamento esperado. O jogador só pode sair dessa situação via `END_TURN`. |
-| `END_TURN` | — | Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. Alterna `currentTeamId`. `turnHits = 0`. `phase → 'turnPass'`. |
+| `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. `turnSkips++`. Se `queue.length === 1`, `currentWord` permanece o mesmo objeto — comportamento esperado. O jogador só pode sair dessa situação via `END_TURN`. |
+| `BACK` | — | Só opera se `turnSkips > 0` e `queue.length > 1`. A última palavra pulada está sempre no final da `queue` (SKIP sempre appenda ao fim, sem reembaralhar). Remove-a do final, coloca-a na posição 0 como novo `currentWord`, e move o `currentWord` anterior para a posição 1. `turnSkips--`. |
+| `END_TURN` | — | Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. Alterna `currentTeamId`. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
 
 ### Rodada
 
@@ -272,7 +281,8 @@ gameOver
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
 | `SELECT_TIEBREAKER_FORMAT` | `1 \| 2 \| 3 \| 4` | `tiebreakerFormat = payload`. `phase → 'roulette'` (sorteia time que começa). |
-| `RANDOMIZE_TIEBREAKER_FORMAT` | — | `tiebreakerFormat = random(1,4)`. `phase → 'roulette'`. |
+| `RANDOMIZE_TIEBREAKER_FORMAT` | — | `phase → 'formatRoulette'`. O formato é sorteado e definido pela `FormatRouletteScreen` via `FORMAT_ROULETTE_DONE`. |
+| `FORMAT_ROULETTE_DONE` | `1 \| 2 \| 3 \| 4` | `tiebreakerFormat = payload`. `phase → 'roulette'` (sorteia time que começa). |
 
 ---
 
@@ -379,7 +389,8 @@ O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remon
 - Botão "Continuar" dispara `SETUP_COMPLETE`.
 
 ### WordInputScreen
-- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `getColor(wordInputCurrentIndex)`. Este `wordInputCurrentIndex` é o `playerIndex` permanente desse jogador — o mesmo valor usado em todas as `Word` que ele criar e em qualquer chamada futura a `getColor()` para exibir sua cor.
+- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `getColor(wordInputCurrentIndex)`.
+- **Campo de nome (opcional):** campo de texto "Seu nome" com placeholder `Jogador N`. Cada keystroke dispara `SET_PLAYER_NAME`. Se deixado em branco, o jogador é exibido como "Jogador N" em todo o jogo. Não bloqueia o botão Confirmar. Este `wordInputCurrentIndex` é o `playerIndex` permanente desse jogador — o mesmo valor usado em todas as `Word` que ele criar e em qualquer chamada futura a `getColor()` para exibir sua cor.
 - Toggle/seletor de time (A ou B) — obrigatório antes de liberar os campos de palavra.
 - Campos de texto: exatamente `wordsPerPlayer` campos.
 - **Edição livre:** todos os campos permanecem editáveis até o clique em Confirmar. O jogador pode alterar qualquer palavra quantas vezes quiser enquanto o dispositivo estiver com ele. Confirmar é a única ação que torna as palavras permanentes.
@@ -415,8 +426,8 @@ O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remon
 - Exibe `Timer` em contagem regressiva a partir de `turnDuration`.
 - Exibe `RoundBadge` com as regras da rodada ativa: usa `ROUNDS[tiebreakerFormat]` quando `tiebreakerFormat !== null`, e `ROUNDS[round]` nos demais casos.
 - Chama `timer.start()` no `useEffect` de montagem — o timer inicia assim que a tela entra em cena. Chama `timer.reset()` na desmontagem.
-- Botão "✅ Acertou" → dispara `HIT`.
-- Botão "⏭️ Pular" → dispara `SKIP`.
+- Botão "✅ Acertou" → dispara `HIT`. Ocupa linha inteira acima dos outros botões.
+- Botões "↩️ Voltar" e "⏭️ Pular" → exibidos lado a lado (grid 2 colunas) abaixo do Hit. "Voltar" dispara `BACK` e fica desabilitado enquanto `turnSkips === 0`. "Pular" dispara `SKIP`.
 - Quando o timer zera: `useTimer` dispara `END_TURN` automaticamente via `onEnd`.
 - `useWakeLock` ativo nesta tela — solicita Wake Lock ao entrar, libera ao sair.
 
@@ -424,6 +435,13 @@ O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remon
 - Exibe o resultado da rodada que acabou (pontos marcados nela — opcional, se quiser derivar do state).
 - Exibe o ícone, número e regra da **próxima** rodada usando `ROUNDS[round + 1]`. Quando esta tela abre, `round` ainda tem o valor da rodada que terminou — `ADVANCE_ROUND` só o incrementa quando o usuário clicar "Continuar".
 - Botão "Continuar" → dispara `ADVANCE_ROUND`.
+
+### FormatRouletteScreen
+- Exibida quando `RANDOMIZE_TIEBREAKER_FORMAT` é disparado.
+- O formato vencedor é gerado localmente via `Math.floor(Math.random() * 4) + 1` antes de iniciar a animação (padrão `useRef`, mesmo da `RouletteScreen`).
+- Anima ciclicamente pelos 4 formatos (ícone + label) com delays decrescentes (slot machine), aterrissando no formato sorteado.
+- Ao finalizar a animação: exibe nome e regra do formato sorteado, depois dispara `FORMAT_ROULETTE_DONE` com o valor.
+- Reutiliza os mesmos `SPIN_DELAYS` da `RouletteScreen`.
 
 ### TiebreakerScreen
 - Exibe mensagem de empate com placar.
