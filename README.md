@@ -1,5 +1,7 @@
 # Papelito
 
+**[papelitos.pages.dev](https://papelitos.pages.dev)**
+
 Um PWA de jogo de festa onde dois times competem em 4 rodadas com regras de comunicação progressivamente mais restritivas.
 
 ## Como Funciona
