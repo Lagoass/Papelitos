@@ -23,6 +23,7 @@ const initialState = {
   round:            1,
   currentWord:      null,
   turnHits:         0,
+  turnSkips:        0,
 
   tiebreakerFormat: null,
 }

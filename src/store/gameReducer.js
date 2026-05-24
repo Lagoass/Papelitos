@@ -108,6 +108,7 @@ const gameReducer = (state, action) => {
       return {
         ...state,
         currentWord: state.queue[0],
+        turnSkips: 0,
         phase: 'playing',
       }
 
@@ -172,7 +173,17 @@ const gameReducer = (state, action) => {
       const rest = state.queue.filter(w => w.id !== state.currentWord.id)
       const newQueue = [...rest, state.currentWord]
       // se queue.length === 1, rest é vazio e newQueue[0] === currentWord (esperado)
-      return { ...state, queue: newQueue, currentWord: newQueue[0] }
+      return { ...state, queue: newQueue, currentWord: newQueue[0], turnSkips: state.turnSkips + 1 }
+    }
+
+    case 'BACK': {
+      // só opera se houver ao menos uma palavra pulada (turnSkips > 0)
+      if (state.turnSkips === 0 || state.queue.length <= 1) return state
+      // a última palavra pulada está sempre no final da queue (SKIP sempre appenda ao fim)
+      const prev = state.queue[state.queue.length - 1]
+      const middle = state.queue.slice(1, -1) // elementos entre currentWord e o último
+      const newQueue = [prev, state.queue[0], ...middle]
+      return { ...state, queue: newQueue, currentWord: prev, turnSkips: state.turnSkips - 1 }
     }
 
     case 'END_TURN': {
@@ -196,6 +207,7 @@ const gameReducer = (state, action) => {
         },
         currentTeamId: nextTeamId,
         turnHits: 0,
+        turnSkips: 0,
         phase: 'turnPass',
       }
     }
@@ -238,11 +250,10 @@ const gameReducer = (state, action) => {
       return { ...state, tiebreakerFormat: action.payload, phase: 'roulette' }
 
     case 'RANDOMIZE_TIEBREAKER_FORMAT':
-      return {
-        ...state,
-        tiebreakerFormat: Math.floor(Math.random() * 4) + 1,
-        phase: 'roulette',
-      }
+      return { ...state, phase: 'formatRoulette' }
+
+    case 'FORMAT_ROULETTE_DONE':
+      return { ...state, tiebreakerFormat: action.payload, phase: 'roulette' }
 
     default:
       return state

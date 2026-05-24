@@ -8,6 +8,7 @@ import TurnPassScreen from './screens/TurnPassScreen/index.jsx'
 import TurnScreen from './screens/TurnScreen/index.jsx'
 import RoundTransitionScreen from './screens/RoundTransitionScreen/index.jsx'
 import TiebreakerScreen from './screens/TiebreakerScreen/index.jsx'
+import FormatRouletteScreen from './screens/FormatRouletteScreen/index.jsx'
 import ResultsScreen from './screens/ResultsScreen/index.jsx'
 import Button from './components/Button/index.jsx'
 import CountdownLock from './components/CountdownLock/index.jsx'
@@ -36,6 +37,7 @@ const PHASE_SCREENS = {
   playing:         TurnScreen,
   roundTransition: RoundTransitionScreen,
   tiebreaker:      TiebreakerScreen,
+  formatRoulette:  FormatRouletteScreen,
   gameOver:        ResultsScreen,
 }
 

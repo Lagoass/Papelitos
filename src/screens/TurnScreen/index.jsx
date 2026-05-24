@@ -27,6 +27,8 @@ const TurnScreen = () => {
 
   if (!currentWord) return null
 
+  const { turnSkips } = state
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col p-6 gap-4">
       {/* Timer + acertos */}
@@ -51,9 +53,18 @@ const TurnScreen = () => {
         <Button onClick={() => dispatch({ type: 'HIT' })}>
           ✅ Acertou
         </Button>
-        <Button variant="secondary" onClick={() => dispatch({ type: 'SKIP' })}>
-          ⏭️ Pular
-        </Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => dispatch({ type: 'BACK' })}
+            disabled={turnSkips === 0}
+          >
+            ↩️ Voltar
+          </Button>
+          <Button variant="secondary" onClick={() => dispatch({ type: 'SKIP' })}>
+            ⏭️ Pular
+          </Button>
+        </div>
       </div>
     </div>
   )
