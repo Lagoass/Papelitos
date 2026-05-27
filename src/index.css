@@ -6,3 +6,88 @@
   color: inherit;
   opacity: 1;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   TEMAS — overrides aplicados via classe no <body> (theme-{id}).
+   Mono é o default e não tem overrides.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Synthwave ── deep violet + magenta/teal accents */
+body.theme-synthwave { background-color: #0f0820; }
+body.theme-synthwave .bg-black,
+body.theme-synthwave .bg-black\/95 { background-color: #0f0820 !important; }
+body.theme-synthwave .bg-zinc-800 { background-color: #1a0f3a !important; }
+body.theme-synthwave .bg-zinc-900 { background-color: #14092e !important; }
+body.theme-synthwave .bg-zinc-700 { background-color: #2d1b5e !important; }
+body.theme-synthwave .border-zinc-600 { border-color: #6d28d9 !important; }
+body.theme-synthwave .border-zinc-700 { border-color: #4c1d95 !important; }
+body.theme-synthwave .text-zinc-300 { color: #ddd6fe !important; }
+body.theme-synthwave .text-zinc-400 { color: #a78bfa !important; }
+body.theme-synthwave .text-zinc-500 { color: #8b5cf6 !important; }
+body.theme-synthwave .bg-white { background-color: #f0abfc !important; }
+body.theme-synthwave .text-black { color: #2d1b5e !important; }
+body.theme-synthwave .border-white { border-color: #f0abfc !important; }
+
+/* ── Minimal ── quase preto + amarelo elétrico */
+body.theme-minimal { background-color: #09090b; }
+body.theme-minimal .bg-black,
+body.theme-minimal .bg-black\/95 { background-color: #09090b !important; }
+body.theme-minimal .bg-zinc-800 { background-color: #18181b !important; }
+body.theme-minimal .bg-zinc-900 { background-color: #0c0c0e !important; }
+body.theme-minimal .bg-zinc-700 { background-color: #27272a !important; }
+body.theme-minimal .border-zinc-600 { border-color: #facc15 !important; }
+body.theme-minimal .border-zinc-700 { border-color: #3f3f46 !important; }
+body.theme-minimal .text-zinc-400 { color: #fde047 !important; }
+body.theme-minimal .text-zinc-500 { color: #ca8a04 !important; }
+body.theme-minimal .bg-white { background-color: #facc15 !important; }
+body.theme-minimal .text-black { color: #09090b !important; }
+body.theme-minimal .border-white { border-color: #facc15 !important; }
+
+/* ── Casino ── emerald + amber */
+body.theme-casino { background-color: #052e16; }
+body.theme-casino .bg-black,
+body.theme-casino .bg-black\/95 { background-color: #052e16 !important; }
+body.theme-casino .bg-zinc-800 { background-color: #14532d !important; }
+body.theme-casino .bg-zinc-900 { background-color: #0a3a1f !important; }
+body.theme-casino .bg-zinc-700 { background-color: #166534 !important; }
+body.theme-casino .border-zinc-600 { border-color: #15803d !important; }
+body.theme-casino .border-zinc-700 { border-color: #166534 !important; }
+body.theme-casino .text-zinc-300 { color: #d1fae5 !important; }
+body.theme-casino .text-zinc-400 { color: #6ee7b7 !important; }
+body.theme-casino .text-zinc-500 { color: #34d399 !important; }
+body.theme-casino .bg-white { background-color: #fbbf24 !important; }
+body.theme-casino .text-black { color: #052e16 !important; }
+body.theme-casino .border-white { border-color: #fbbf24 !important; }
+
+/* ── Junina ── maroon + amber + cyan toques */
+body.theme-junina { background-color: #1c0a0a; }
+body.theme-junina .bg-black,
+body.theme-junina .bg-black\/95 { background-color: #1c0a0a !important; }
+body.theme-junina .bg-zinc-800 { background-color: #450a0a !important; }
+body.theme-junina .bg-zinc-900 { background-color: #2d0a0a !important; }
+body.theme-junina .bg-zinc-700 { background-color: #7f1d1d !important; }
+body.theme-junina .border-zinc-600 { border-color: #991b1b !important; }
+body.theme-junina .border-zinc-700 { border-color: #7f1d1d !important; }
+body.theme-junina .text-zinc-300 { color: #fef3c7 !important; }
+body.theme-junina .text-zinc-400 { color: #fca5a5 !important; }
+body.theme-junina .text-zinc-500 { color: #f87171 !important; }
+body.theme-junina .bg-white { background-color: #fcd34d !important; }
+body.theme-junina .text-black { color: #450a0a !important; }
+body.theme-junina .border-white { border-color: #fcd34d !important; }
+
+/* ── Light ── cream + dark text + orange accent */
+body.theme-light { background-color: #fef9f0; }
+body.theme-light .bg-black,
+body.theme-light .bg-black\/95 { background-color: #fef9f0 !important; }
+body.theme-light .bg-zinc-800 { background-color: #f5ede0 !important; }
+body.theme-light .bg-zinc-900 { background-color: #eee5d4 !important; }
+body.theme-light .bg-zinc-700 { background-color: #e6dac3 !important; }
+body.theme-light .border-zinc-600 { border-color: #d4c5a8 !important; }
+body.theme-light .border-zinc-700 { border-color: #c8b896 !important; }
+body.theme-light .text-white { color: #1c1917 !important; }
+body.theme-light .text-zinc-300 { color: #44403c !important; }
+body.theme-light .text-zinc-400 { color: #57534e !important; }
+body.theme-light .text-zinc-500 { color: #78716c !important; }
+body.theme-light .bg-white { background-color: #ea580c !important; }
+body.theme-light .text-black { color: #ffffff !important; }
+body.theme-light .border-white { border-color: #ea580c !important; }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import Button from '../../components/Button/index.jsx'
 import { isTestMode, setTestMode, matchesToggleCombo } from '../../utils/dev.js'
+import SettingsScreen from '../SettingsScreen/index.jsx'
 
 const SetupScreen = () => {
   const { state, dispatch } = useGame()
@@ -9,6 +10,28 @@ const SetupScreen = () => {
   const [themeInput, setThemeInput] = useState('')
   const [testMode, setTestModeState] = useState(() => isTestMode())
   const [toast, setToast] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
+  // Estado local dos inputs numéricos — permite ficar vazio enquanto edita.
+  // Sincronizado quando o valor no state muda externamente (ex: SET_MODE reseta wordsPerPlayer).
+  const [durationInput, setDurationInput] = useState(String(turnDuration))
+  const [wordsInput, setWordsInput] = useState(String(wordsPerPlayer))
+
+  useEffect(() => { setDurationInput(String(turnDuration)) }, [turnDuration])
+  useEffect(() => { setWordsInput(String(wordsPerPlayer)) }, [wordsPerPlayer])
+
+  const handleDurationBlur = () => {
+    const n = Number(durationInput)
+    const valid = Number.isFinite(n) && n >= 10 ? n : 10
+    dispatch({ type: 'SET_TURN_DURATION', payload: valid })
+    setDurationInput(String(valid))
+  }
+
+  const handleWordsBlur = () => {
+    const n = Number(wordsInput)
+    const valid = Number.isFinite(n) && n >= 1 ? n : 1
+    dispatch({ type: 'SET_WORDS_PER_PLAYER', payload: valid })
+    setWordsInput(String(valid))
+  }
 
   // Auto-dismiss do toast após 2s
   useEffect(() => {
@@ -45,9 +68,19 @@ const SetupScreen = () => {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col p-6">
-      <h1 className="text-4xl font-black text-center mb-10 tracking-tight">
-        {testMode ? 'Teste Papelito' : 'Papelito'}
-      </h1>
+      {/* Header com título e botão de configurações */}
+      <div className="relative mb-10">
+        <h1 className="text-4xl font-black text-center tracking-tight">
+          {testMode ? 'Teste Papelito' : 'Papelito'}
+        </h1>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 text-2xl leading-none active:scale-90 transition-transform"
+          aria-label="Configurações"
+        >
+          ⚙️
+        </button>
+      </div>
 
       {/* Modo */}
       <section className="mb-7">
@@ -100,8 +133,9 @@ const SetupScreen = () => {
           inputMode="numeric"
           min={10}
           max={300}
-          value={turnDuration}
-          onChange={e => dispatch({ type: 'SET_TURN_DURATION', payload: Math.max(10, Number(e.target.value)) })}
+          value={durationInput}
+          onChange={e => setDurationInput(e.target.value)}
+          onBlur={handleDurationBlur}
           className="w-full bg-zinc-800 text-white text-xl text-center py-3 rounded-xl border border-zinc-700 focus:outline-none focus:border-white"
         />
       </section>
@@ -117,12 +151,14 @@ const SetupScreen = () => {
             inputMode="numeric"
             min={1}
             max={20}
-            value={wordsPerPlayer}
-            onChange={e => dispatch({ type: 'SET_WORDS_PER_PLAYER', payload: Math.max(1, Number(e.target.value)) })}
+            value={wordsInput}
+            onChange={e => setWordsInput(e.target.value)}
+            onBlur={handleWordsBlur}
             className="w-full bg-zinc-800 text-white text-xl text-center py-3 rounded-xl border border-zinc-700 focus:outline-none focus:border-white"
           />
         </section>
       )}
+
 
       {/* Temas — Modo Temático */}
       {mode === 'themed' && (
@@ -182,6 +218,9 @@ const SetupScreen = () => {
           {toast}
         </div>
       )}
+
+      {/* Overlay de configurações */}
+      {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
