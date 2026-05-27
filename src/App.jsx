@@ -11,7 +11,6 @@ import TiebreakerScreen from './screens/TiebreakerScreen/index.jsx'
 import FormatRouletteScreen from './screens/FormatRouletteScreen/index.jsx'
 import ResultsScreen from './screens/ResultsScreen/index.jsx'
 import Button from './components/Button/index.jsx'
-import CountdownLock from './components/CountdownLock/index.jsx'
 
 const ResumeModal = ({ savedPhase, onResume, onNew }) => (
   <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-6 z-50">
@@ -21,9 +20,7 @@ const ResumeModal = ({ savedPhase, onResume, onNew }) => (
     </p>
     <div className="w-full space-y-4">
       <Button onClick={onResume}>Retomar partida</Button>
-      <CountdownLock seconds={5} onConfirm={onNew} variant="secondary">
-        Nova partida
-      </CountdownLock>
+      <Button variant="secondary" onClick={onNew}>Nova partida</Button>
     </div>
   </div>
 )

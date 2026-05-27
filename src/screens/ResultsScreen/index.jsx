@@ -1,6 +1,6 @@
 import { useGame } from '../../store/GameContext.jsx'
 import { TEAM_COLORS } from '../../components/ScoreBoard/index.jsx'
-import CountdownLock from '../../components/CountdownLock/index.jsx'
+import Button from '../../components/Button/index.jsx'
 
 const ResultsScreen = () => {
   const { state, dispatch } = useGame()
@@ -62,13 +62,9 @@ const ResultsScreen = () => {
 
       {/* localStorage já limpo pelo GameContext ao entrar em gameOver — seção 12 */}
       <div className="w-full">
-        <CountdownLock
-          seconds={5}
-          onConfirm={() => dispatch({ type: 'RESET_GAME' })}
-          variant="secondary"
-        >
+        <Button variant="secondary" onClick={() => dispatch({ type: 'RESET_GAME' })}>
           Nova Partida
-        </CountdownLock>
+        </Button>
       </div>
     </div>
   )

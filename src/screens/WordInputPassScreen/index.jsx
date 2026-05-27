@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import Button from '../../components/Button/index.jsx'
-import CountdownLock from '../../components/CountdownLock/index.jsx'
 
 const WordInputPassScreen = () => {
   const { state, dispatch } = useGame()
@@ -51,9 +50,9 @@ const WordInputPassScreen = () => {
             <Button variant="secondary" onClick={() => setShowConfirm(false)}>
               Não
             </Button>
-            <CountdownLock seconds={5} onConfirm={() => dispatch({ type: 'START_GAME' })}>
+            <Button onClick={() => dispatch({ type: 'START_GAME' })}>
               Sim, iniciar
-            </CountdownLock>
+            </Button>
           </div>
         </div>
       )}

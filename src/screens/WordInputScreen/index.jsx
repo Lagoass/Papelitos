@@ -77,27 +77,17 @@ const WordInputScreen = () => {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col p-6">
-      {/* Header */}
+      {/* Header — input seamless estilizado como título */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold" style={{ color }}>
-          Jogador {wordInputCurrentIndex + 1}
-        </h2>
-        <p className="text-zinc-400 text-sm mt-1">
-          Escolha seu time e insira suas {wordsPerPlayer} palavras
-        </p>
-      </div>
-
-      {/* Nome do jogador */}
-      <section className="mb-6">
-        <p className="text-xs text-zinc-400 uppercase tracking-widest mb-2">Seu nome</p>
         <input
           type="text"
           value={name}
           onChange={e => handleNameChange(e.target.value)}
           placeholder={`Jogador ${wordInputCurrentIndex + 1}`}
-          className="w-full bg-zinc-800 text-white py-3 px-4 rounded-xl border border-zinc-600 focus:outline-none text-base"
+          className="w-full bg-transparent text-2xl font-bold focus:outline-none"
+          style={{ color }}
         />
-      </section>
+      </div>
 
       {/* Seletor de time */}
       <section className="mb-6">
