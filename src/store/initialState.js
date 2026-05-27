@@ -9,11 +9,13 @@ const initialState = {
   players:              [],
   wordInputCurrentIndex: 0,
 
+  numTeams: 2,
   teams: {
     A: { score: 0, playerIndices: [], queuePos: 0 },
     B: { score: 0, playerIndices: [], queuePos: 0 },
   },
 
+  teamOrder:      [],          // ordem ciclica, preenchida no ROULETTE_DONE
   currentTeamId:  null,
   roundStartTeam: null,
 
@@ -26,6 +28,7 @@ const initialState = {
   turnSkips:        0,
 
   tiebreakerFormat: null,
+  tiebreakerTeams:  [],        // IDs dos times empatados que disputam o desempate
 }
 
 export default initialState

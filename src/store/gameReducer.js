@@ -1,5 +1,7 @@
 import initialState from './initialState.js'
 import { shuffle } from '../utils/shuffle.js'
+import { buildTeams, teamIdsFor } from '../utils/teams.js'
+import { FAKE_WORDS } from '../utils/dev.js'
 
 const gameReducer = (state, action) => {
   switch (action.type) {
@@ -19,6 +21,11 @@ const gameReducer = (state, action) => {
     case 'SET_WORDS_PER_PLAYER':
       return { ...state, wordsPerPlayer: action.payload }
 
+    case 'SET_NUM_TEAMS': {
+      const n = action.payload
+      return { ...state, numTeams: n, teams: buildTeams(n) }
+    }
+
     case 'ADD_THEME': {
       const newThemes = [...state.themes, action.payload]
       return { ...state, themes: newThemes, wordsPerPlayer: newThemes.length }
@@ -33,8 +40,51 @@ const gameReducer = (state, action) => {
       return {
         ...state,
         players: [{ index: 0, teamId: null, name: '' }],
+        teams: buildTeams(state.numTeams),
         phase: 'wordInput',
       }
+
+    case 'TEST_QUICK_START': {
+      const { numTeams, wordsPerPlayer } = state
+      const wpp = wordsPerPlayer > 0 ? wordsPerPlayer : 5
+      const totalPlayers = 2 * numTeams
+      const teamIds = teamIdsFor(numTeams)
+
+      const players = []
+      const teams = buildTeams(numTeams)
+      const wordBank = shuffle([...FAKE_WORDS])
+      let cursor = 0
+      const pool = []
+
+      for (let i = 0; i < totalPlayers; i++) {
+        const teamId = teamIds[i % numTeams]
+        players.push({ index: i, teamId, name: `Teste ${i + 1}` })
+        teams[teamId].playerIndices.push(i)
+
+        for (let w = 0; w < wpp; w++) {
+          const word = wordBank[cursor % wordBank.length]
+          const dup = Math.floor(cursor / wordBank.length)
+          cursor++
+          pool.push({
+            id: crypto.randomUUID(),
+            text: dup > 0 ? `${word} ${dup + 1}` : word,
+            theme: null,
+            playerIndex: i,
+          })
+        }
+      }
+
+      return {
+        ...state,
+        mode: 'normal',
+        themes: [],
+        players,
+        wordInputCurrentIndex: totalPlayers - 1,
+        teams,
+        pool,
+        phase: 'roulette',
+      }
+    }
 
     // ── Inserção de palavras ───────────────────────────────────────────────
 
@@ -88,26 +138,30 @@ const gameReducer = (state, action) => {
     }
 
     case 'START_GAME': {
-      const { players, teams } = state
+      const { players, teams, numTeams } = state
+      const ids = teamIdsFor(numTeams)
       const valid =
-        players.length >= 4 &&
-        teams.A.playerIndices.length >= 2 &&
-        teams.B.playerIndices.length >= 2
+        players.length >= 2 * numTeams &&
+        ids.every(id => teams[id].playerIndices.length >= 2)
       if (!valid) return state
       return { ...state, phase: 'roulette' }
     }
 
     // ── Roulette e início ──────────────────────────────────────────────────
 
-    case 'ROULETTE_DONE':
+    case 'ROULETTE_DONE': {
+      // payload: { teamOrder, firstTeam }
       // queuePos nunca alterado aqui — seção 8.6
+      const { teamOrder, firstTeam } = action.payload
       return {
         ...state,
-        currentTeamId: action.payload,
-        roundStartTeam: action.payload,
+        teamOrder,
+        currentTeamId: firstTeam,
+        roundStartTeam: firstTeam,
         queue: shuffle([...state.pool]),
         phase: 'turnPass',
       }
+    }
 
     // ── Turno ──────────────────────────────────────────────────────────────
 
@@ -120,7 +174,7 @@ const gameReducer = (state, action) => {
       }
 
     case 'HIT': {
-      const { currentTeamId, currentWord, queue, teams, turnHits, round } = state
+      const { currentTeamId, currentWord, queue, teams, turnHits, round, numTeams } = state
 
       const newTeams = {
         ...teams,
@@ -135,8 +189,13 @@ const gameReducer = (state, action) => {
 
       if (newQueue.length === 0) {
         if (round === 4) {
-          // usa newTeams para checar empate com o placar já incrementado
-          if (newTeams.A.score === newTeams.B.score) {
+          // determina vencedor / empate entre N times
+          const ids = teamIdsFor(numTeams)
+          const scores = ids.map(id => newTeams[id].score)
+          const maxScore = Math.max(...scores)
+          const tied = ids.filter(id => newTeams[id].score === maxScore)
+
+          if (tied.length > 1) {
             return {
               ...state,
               teams: newTeams,
@@ -145,6 +204,7 @@ const gameReducer = (state, action) => {
               phase: 'tiebreaker',
               currentWord: null,
               tiebreakerFormat: null,
+              tiebreakerTeams: tied,
             }
           }
           return {
@@ -179,23 +239,23 @@ const gameReducer = (state, action) => {
       // move currentWord do início para o fim da queue
       const rest = state.queue.filter(w => w.id !== state.currentWord.id)
       const newQueue = [...rest, state.currentWord]
-      // se queue.length === 1, rest é vazio e newQueue[0] === currentWord (esperado)
       return { ...state, queue: newQueue, currentWord: newQueue[0], turnSkips: state.turnSkips + 1 }
     }
 
     case 'BACK': {
-      // só opera se houver ao menos uma palavra pulada (turnSkips > 0)
       if (state.turnSkips === 0 || state.queue.length <= 1) return state
-      // a última palavra pulada está sempre no final da queue (SKIP sempre appenda ao fim)
       const prev = state.queue[state.queue.length - 1]
-      const middle = state.queue.slice(1, -1) // elementos entre currentWord e o último
+      const middle = state.queue.slice(1, -1)
       const newQueue = [prev, state.queue[0], ...middle]
       return { ...state, queue: newQueue, currentWord: prev, turnSkips: state.turnSkips - 1 }
     }
 
     case 'END_TURN': {
-      const { currentTeamId, currentWord, queue, teams } = state
-      const nextTeamId = currentTeamId === 'A' ? 'B' : 'A'
+      const { currentTeamId, currentWord, queue, teams, teamOrder } = state
+      // guard: END_TURN só faz sentido durante 'playing' com currentWord válido
+      if (!currentWord || state.phase !== 'playing') return state
+      const idx = teamOrder.indexOf(currentTeamId)
+      const nextTeamId = teamOrder[(idx + 1) % teamOrder.length]
 
       // reinserir currentWord no final antes do shuffle — seção 8.4
       const withoutCurrent = queue.filter(w => w.id !== currentWord.id)
@@ -222,7 +282,9 @@ const gameReducer = (state, action) => {
     // ── Rodada ────────────────────────────────────────────────────────────
 
     case 'ADVANCE_ROUND': {
-      const newRoundStartTeam = state.roundStartTeam === 'A' ? 'B' : 'A'
+      const { teamOrder, roundStartTeam } = state
+      const idx = teamOrder.indexOf(roundStartTeam)
+      const newRoundStartTeam = teamOrder[(idx + 1) % teamOrder.length]
 
       return {
         ...state,
@@ -238,6 +300,7 @@ const gameReducer = (state, action) => {
           },
         },
         turnHits: 0,
+        turnSkips: 0,
         phase: 'turnPass',
       }
     }

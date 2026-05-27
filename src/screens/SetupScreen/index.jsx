@@ -1,11 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import Button from '../../components/Button/index.jsx'
+import { isTestMode, setTestMode, matchesToggleCombo } from '../../utils/dev.js'
 
 const SetupScreen = () => {
   const { state, dispatch } = useGame()
-  const { mode, turnDuration, wordsPerPlayer, themes } = state
+  const { mode, turnDuration, wordsPerPlayer, themes, numTeams } = state
   const [themeInput, setThemeInput] = useState('')
+  const [testMode, setTestModeState] = useState(() => isTestMode())
+  const [toast, setToast] = useState(null)
+
+  // Auto-dismiss do toast após 2s
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const addTheme = () => {
     const trimmed = themeInput.trim()
@@ -16,23 +26,65 @@ const SetupScreen = () => {
 
   const canContinue = mode === 'normal' || themes.length > 0
 
+  const handleContinue = () => {
+    // Combo secreto: 4 times + 44s + 4 palavras → alterna TEST_MODE
+    if (matchesToggleCombo({ numTeams, turnDuration, wordsPerPlayer })) {
+      const next = !testMode
+      setTestMode(next)
+      setTestModeState(next)
+      setToast(`Modo de teste ${next ? 'ativado' : 'desativado'}`)
+      return
+    }
+
+    if (testMode) {
+      dispatch({ type: 'TEST_QUICK_START' })
+    } else {
+      dispatch({ type: 'SETUP_COMPLETE' })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col p-6">
-      <h1 className="text-4xl font-black text-center mb-10 tracking-tight">Papelito</h1>
+      <h1 className="text-4xl font-black text-center mb-10 tracking-tight">
+        {testMode ? 'Teste Papelito' : 'Papelito'}
+      </h1>
 
       {/* Modo */}
       <section className="mb-7">
         <p className="text-xs text-zinc-400 uppercase tracking-widest mb-2">Modo</p>
         <div className="flex gap-3">
-          {['normal', 'themed'].map(m => (
+          {['normal', 'themed'].map(m => {
+            const locked = testMode && m === 'themed'
+            return (
+              <button
+                key={m}
+                onClick={() => !locked && dispatch({ type: 'SET_MODE', payload: m })}
+                disabled={locked}
+                className={`relative flex-1 py-3 rounded-xl font-semibold text-sm transition-colors ${
+                  mode === m ? 'bg-white text-black' : 'bg-zinc-800 text-white'
+                } ${locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                {m === 'normal' ? 'Normal' : 'Temático'}
+                {locked && <span className="ml-2">🔒</span>}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Quantidade de times */}
+      <section className="mb-7">
+        <p className="text-xs text-zinc-400 uppercase tracking-widest mb-2">Quantidade de times</p>
+        <div className="flex gap-3">
+          {[2, 3, 4].map(n => (
             <button
-              key={m}
-              onClick={() => dispatch({ type: 'SET_MODE', payload: m })}
-              className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-colors ${
-                mode === m ? 'bg-white text-black' : 'bg-zinc-800 text-white'
+              key={n}
+              onClick={() => dispatch({ type: 'SET_NUM_TEAMS', payload: n })}
+              className={`flex-1 py-3 rounded-xl font-semibold transition-colors ${
+                numTeams === n ? 'bg-white text-black' : 'bg-zinc-800 text-white'
               }`}
             >
-              {m === 'normal' ? 'Normal' : 'Temático'}
+              <span className="text-lg">{n}</span>
             </button>
           ))}
         </div>
@@ -119,10 +171,17 @@ const SetupScreen = () => {
       )}
 
       <div className="mt-auto pt-6">
-        <Button onClick={() => dispatch({ type: 'SETUP_COMPLETE' })} disabled={!canContinue}>
+        <Button onClick={handleContinue} disabled={!canContinue}>
           Continuar
         </Button>
       </div>
+
+      {/* Toast do combo secreto */}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-white text-black px-5 py-3 rounded-xl font-semibold text-sm shadow-lg z-50">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

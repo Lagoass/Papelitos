@@ -1,18 +1,20 @@
 import { useGame } from '../../store/GameContext.jsx'
 import { ROUNDS } from '../../components/RoundBadge/index.jsx'
+import { TEAM_SYMBOLS } from '../../utils/teams.js'
 import ScoreBoard from '../../components/ScoreBoard/index.jsx'
 import Button from '../../components/Button/index.jsx'
 
 const TiebreakerScreen = () => {
   const { state, dispatch } = useGame()
-  const { teams } = state
+  const { teams, tiebreakerTeams } = state
+  const tiedScore = tiebreakerTeams.length > 0 ? teams[tiebreakerTeams[0]].score : 0
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col p-6 gap-5">
       <div className="pt-4 text-center">
         <p className="text-3xl font-black mb-1">Empate!</p>
         <p className="text-zinc-400 text-sm">
-          Ambos os times terminaram com {teams.A.score} pontos.
+          {tiebreakerTeams.map(id => TEAM_SYMBOLS[id]).join(' e ')} terminaram com {tiedScore} pontos.
         </p>
       </div>
 

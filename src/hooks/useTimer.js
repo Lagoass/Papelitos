@@ -5,6 +5,7 @@ const useTimer = ({ duration, onEnd }) => {
   const [isRunning, setIsRunning] = useState(false)
   const intervalRef = useRef(null)
   const onEndRef = useRef(onEnd)
+  const endedRef = useRef(false)
 
   useEffect(() => {
     onEndRef.current = onEnd
@@ -19,20 +20,23 @@ const useTimer = ({ duration, onEnd }) => {
 
   const start = () => {
     if (isRunning) return
+    endedRef.current = false
     setIsRunning(true)
     intervalRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(intervalRef.current)
-          intervalRef.current = null
-          setIsRunning(false)
-          onEndRef.current?.()
-          return 0
-        }
-        return prev - 1
-      })
+      // updater puro — apenas atualiza o estado
+      setTimeLeft(prev => Math.max(0, prev - 1))
     }, 1000)
   }
+
+  // Side effect separado: detecta quando o timer zera e dispara onEnd uma única vez
+  useEffect(() => {
+    if (timeLeft === 0 && isRunning && !endedRef.current) {
+      endedRef.current = true
+      clearTimer()
+      setIsRunning(false)
+      onEndRef.current?.()
+    }
+  }, [timeLeft, isRunning])
 
   const pause = () => {
     clearTimer()
@@ -43,6 +47,7 @@ const useTimer = ({ duration, onEnd }) => {
     clearTimer()
     setIsRunning(false)
     setTimeLeft(duration)
+    endedRef.current = false
   }
 
   useEffect(() => clearTimer, [])

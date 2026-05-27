@@ -44,7 +44,7 @@ papelito/
 │   │   ├── WordInputScreen/        → seleção de time + inserção de palavras
 │   │   ├── WordInputPassScreen/    → bloqueio entre jogadores no setup
 │   │   ├── RouletteScreen/         → animação de sorteio do time inicial
-│   │   ├── FormatRouletteScreen/   → animação de sorteio do formato do desempate
+│   │   ├── FormatRouletteScreen/   → animação de sorteio do formato do desempate (RANDOMIZE_TIEBREAKER_FORMAT)
 │   │   ├── TurnPassScreen/         → tela de passagem do dispositivo entre turnos
 │   │   ├── TurnScreen/             → palavra ativa + timer + botões Hit/Skip
 │   │   ├── RoundTransitionScreen/  → fim de rodada + exibição da nova regra
@@ -71,7 +71,9 @@ papelito/
 │   │
 │   ├── utils/
 │   │   ├── shuffle.js              → Fisher-Yates shuffle
-│   │   ├── colors.js               → paleta PLAYER_COLORS + getColor(playerIndex)
+│   │   ├── colors.js               → paleta PLAYER_COLORS (12 cores) + getColor(playerIndex)
+│   │   ├── teams.js                → TEAM_IDS, TEAM_SYMBOLS, teamIdsFor(n), buildTeams(n)
+│   │   ├── dev.js                  → TEST_MODE (boolean) + FAKE_WORDS (pool de teste)
 │   │   └── storage.js              → exporta STORAGE_KEY + funções serialize/deserialize
 │   │                                  (useLocalStorage.js consome este arquivo — não duplicar lógica)
 │   │
@@ -104,10 +106,10 @@ papelito/
 // Player — criado incrementalmente conforme cada jogador passa pelo dispositivo.
 // Primeiro slot criado em SETUP_COMPLETE. Slots subsequentes criados em NEXT_PLAYER.
 {
-  index:  number,            // 0-based. "Jogador N" = index + 1
-  teamId: 'A' | 'B' | null, // null até o jogador escolher o time em wordInput
-  name:   string,            // '' por padrão. Preenchido opcionalmente via SET_PLAYER_NAME.
-                             // Fallback para exibição: name.trim() || `Jogador ${index + 1}`
+  index:  number,                          // 0-based. "Jogador N" = index + 1
+  teamId: 'A' | 'B' | 'C' | 'D' | null,    // null até o jogador escolher o time em wordInput
+  name:   string,                          // '' por padrão. Preenchido opcionalmente via SET_PLAYER_NAME.
+                                           // Fallback para exibição: name.trim() || `Jogador ${index + 1}`
   // cor não é armazenada — sempre derivada via getColor(index) sob demanda (ver seção 11)
 }
 
@@ -150,17 +152,23 @@ const initialState = {
   wordInputCurrentIndex: 0,
 
   // ── TIMES ─────────────────────────────────────────────────────────────────
-  teams: {
+  numTeams: 2,               // 2 | 3 | 4 — definido no SetupScreen
+  teams: {                   // construído dinamicamente via buildTeams(numTeams). Default = 2 times.
     A: { score: 0, playerIndices: [], queuePos: 0 },
     B: { score: 0, playerIndices: [], queuePos: 0 },
   },
 
+  // Ordem cíclica de jogada — definida pela RouletteScreen via shuffle de teamIdsFor(numTeams).
+  // teamOrder[0] === currentTeamId após ROULETTE_DONE. Usada em END_TURN e ADVANCE_ROUND para
+  // calcular o próximo time ciclicamente.
+  teamOrder: [],             // ('A' | 'B' | 'C' | 'D')[]
+
   // Time jogando no turno atual.
-  currentTeamId: null,       // 'A' | 'B' — definido após a roulette
+  currentTeamId: null,       // 'A' | 'B' | 'C' | 'D' — definido após a roulette
 
   // Time que abriu a rodada atual.
-  // Usado para calcular qual time abre a próxima rodada (alternância rígida).
-  roundStartTeam: null,      // 'A' | 'B'
+  // Usado para calcular qual time abre a próxima rodada via teamOrder.
+  roundStartTeam: null,      // 'A' | 'B' | 'C' | 'D'
 
   // ── POOL E FILA ───────────────────────────────────────────────────────────
   // pool: IMUTÁVEL após START_GAME. Nunca é modificado durante o jogo.
@@ -180,6 +188,8 @@ const initialState = {
 
   // ── DESEMPATE ─────────────────────────────────────────────────────────────
   tiebreakerFormat: null,    // 1 | 2 | 3 | 4 — formato sorteado ou escolhido
+  tiebreakerTeams:  [],      // IDs dos times empatados no topo após Rodada 4.
+                             // Apenas esses times disputam o desempate; os demais assistem.
 }
 ```
 
@@ -237,16 +247,18 @@ gameOver
 | `SET_MODE` | `'normal' \| 'themed'` | Atualiza `mode`. Ao trocar para `normal`: reseta `themes: []` e `wordsPerPlayer: 5`. Ao trocar para `themed`: reseta `themes: []` e `wordsPerPlayer: 0` (será derivado de `themes.length` conforme temas forem adicionados). |
 | `SET_TURN_DURATION` | `number` | Atualiza `turnDuration`. |
 | `SET_WORDS_PER_PLAYER` | `number` | Só válido no Modo Normal. |
+| `SET_NUM_TEAMS` | `2 \| 3 \| 4` | Atualiza `numTeams` e reconstrói `teams` via `buildTeams(n)`. Disponível apenas no setup. |
 | `ADD_THEME` | `string` | Adiciona ao array `themes`. `wordsPerPlayer` passa a ser `themes.length`. |
 | `REMOVE_THEME` | `string` | Remove do array `themes`. Recalcula `wordsPerPlayer`. |
-| `SETUP_COMPLETE` | — | Cria apenas o primeiro slot em `players[]`: `{ index: 0, teamId: null }`. `phase → 'wordInput'`. |
+| `SETUP_COMPLETE` | — | Cria o primeiro slot em `players[]`: `{ index: 0, teamId: null, name: '' }`. Reconstrói `teams` via `buildTeams(numTeams)` (garante consistência caso o usuário tenha mudado `numTeams` após criar players em um setup anterior). `phase → 'wordInput'`. |
+| `TEST_QUICK_START` | — | **Modo de teste** (ver seção 17). Força `mode: 'normal'`, gera `2 × numTeams` jogadores nomeados "Teste N" distribuídos uniformemente entre os times, popula o `pool` com palavras de `FAKE_WORDS` (com sufixo numérico se sair do pool), `phase → 'roulette'`. Dispatched pela `SetupScreen` no lugar de `SETUP_COMPLETE` quando `TEST_MODE === true`. |
 
 ### Inserção de Palavras
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
 | `SET_PLAYER_NAME` | `string` | Atualiza `name` do objeto em `players[wordInputCurrentIndex]`. Disparado a cada keystroke no campo de nome da `WordInputScreen`. |
-| `SET_PLAYER_TEAM` | `'A' \| 'B'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. |
+| `SET_PLAYER_TEAM` | `'A' \| 'B' \| 'C' \| 'D'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. IDs válidos limitados aos times ativos (`teamIdsFor(numTeams)`). |
 | `PLAYER_CONFIRMED` | `{ words: [{ text, theme? }] }` | Irreversível. Recebe todas as palavras do jogador em batch. Para cada word, cria `{ id: crypto.randomUUID(), text, theme, playerIndex: wordInputCurrentIndex }` e adiciona ao `pool`. O `teamId` usado é `players[wordInputCurrentIndex].teamId` — atribuído anteriormente via `SET_PLAYER_TEAM`. O botão Confirmar só fica habilitado quando `teamId !== null`, garantindo que nunca seja null aqui. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. No Modo Temático, cada word inclui `theme: themes[i]` — montado pela tela antes do dispatch. No Modo Normal, `theme: null`. |
 | `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null }`. `phase → 'wordInput'`. |
 | `START_GAME` | — | Validação deve passar (ver seção 8.1). Trava o `pool`. `phase → 'roulette'`. |
@@ -255,7 +267,7 @@ gameOver
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `ROULETTE_DONE` | `'A' \| 'B'` | Define `currentTeamId` e `roundStartTeam`. Sempre reconstrói `queue = shuffle([...pool])`, tanto no Round 1 quanto no desempate. Não altera `queuePos` — usa o valor atual. `phase → 'turnPass'`. |
+| `ROULETTE_DONE` | `{ teamOrder, firstTeam }` | `teamOrder` é a ordem cíclica completa (shuffle de `teamIdsFor(numTeams)`, ou de `tiebreakerTeams` durante desempate). `firstTeam === teamOrder[0]`. Define `currentTeamId` e `roundStartTeam` como `firstTeam`. Sempre reconstrói `queue = shuffle([...pool])`, tanto no Round 1 quanto no desempate. Não altera `queuePos` — usa o valor atual. `phase → 'turnPass'`. |
 
 ### Turno
 
@@ -265,13 +277,13 @@ gameOver
 | `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue` filtrando por id: `queue.filter(w => w.id !== currentWord.id)`. Verifica se `queue.length === 0` (ver seção 8.2). Caso contrário: `currentWord = queue[0]`. |
 | `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. `turnSkips++`. Se `queue.length === 1`, `currentWord` permanece o mesmo objeto — comportamento esperado. O jogador só pode sair dessa situação via `END_TURN`. |
 | `BACK` | — | Só opera se `turnSkips > 0` e `queue.length > 1`. A última palavra pulada está sempre no final da `queue` (SKIP sempre appenda ao fim, sem reembaralhar). Remove-a do final, coloca-a na posição 0 como novo `currentWord`, e move o `currentWord` anterior para a posição 1. `turnSkips--`. |
-| `END_TURN` | — | Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. Alterna `currentTeamId`. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
+| `END_TURN` | — | **Guard:** retorna `state` inalterado se `currentWord === null` ou `phase !== 'playing'` (proteção contra reentrância). Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. `nextTeamId = teamOrder[(idx + 1) % teamOrder.length]` onde `idx = teamOrder.indexOf(currentTeamId)`. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
 
 ### Rodada
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = time oposto ao roundStartTeam atual`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `turnHits = 0`. `phase → 'turnPass'`. |
+| `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = teamOrder[(idx + 1) % teamOrder.length]` onde `idx = teamOrder.indexOf(roundStartTeam)`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
 | `GAME_OVER` | — | `phase → 'gameOver'`. O reducer não toca o localStorage — side effect tratado pelo `GameContext` (ver seção 12). |
 | `RESET_GAME` | — | Retorna `initialState` diretamente. Disparado pelo `ResultsScreen` ao confirmar "Nova Partida". O localStorage já foi limpo pelo `GameContext` quando `phase` virou `'gameOver'`. |
 | `LOAD_GAME` | `GameState` | Retorna o payload diretamente como novo estado. Disparado pelo `App.jsx` ao confirmar retomada de partida salva. |
@@ -290,12 +302,11 @@ gameOver
 
 ### 8.1 Validação do START_GAME
 
-`START_GAME` só é processado se todas as três condições forem satisfeitas simultaneamente:
-- `players.length >= 4`
-- `teams.A.playerIndices.length >= 2`
-- `teams.B.playerIndices.length >= 2`
+`START_GAME` só é processado se ambas as condições forem satisfeitas simultaneamente:
+- `players.length >= 2 * numTeams`
+- Para cada `id` em `teamIdsFor(numTeams)`: `teams[id].playerIndices.length >= 2`
 
-O botão "Iniciar Jogo" só é **renderizado** na `WordInputPassScreen` quando essas três condições são verdadeiras. Se o botão não aparece, não há erro — as condições simplesmente ainda não foram atingidas.
+O botão "Iniciar Jogo" só é **renderizado** na `WordInputPassScreen` quando essas condições são verdadeiras. Se o botão não aparece, não há erro — as condições simplesmente ainda não foram atingidas.
 
 ### 8.2 Detecção de Fim de Rodada e Fim de Jogo
 
@@ -304,23 +315,32 @@ Após cada `HIT`, verificar na seguinte ordem:
 ```javascript
 // Dentro do case HIT do reducer — após remover currentWord da queue:
 const newQueue = state.queue.filter(w => w.id !== state.currentWord.id)
+const ids = teamIdsFor(state.numTeams)
 
 if (newQueue.length === 0) {
   if (state.round === 4) {
-    if (state.teams.A.score === state.teams.B.score) {
-      return { ...state, queue: newQueue, phase: 'tiebreaker', currentWord: null, tiebreakerFormat: null }
-    } else {
-      return { ...state, queue: newQueue, phase: 'gameOver', currentWord: null }
+    // Detecta empate considerando N times: pega o(s) time(s) com maxScore
+    const maxScore = Math.max(...ids.map(id => newTeams[id].score))
+    const tied = ids.filter(id => newTeams[id].score === maxScore)
+    if (tied.length > 1) {
+      return {
+        ...state,
+        queue: newQueue,
+        phase: 'tiebreaker',
+        currentWord: null,
+        tiebreakerFormat: null,
+        tiebreakerTeams: tied,
+      }
     }
-  } else {
-    return { ...state, queue: newQueue, phase: 'roundTransition', currentWord: null }
+    return { ...state, queue: newQueue, phase: 'gameOver', currentWord: null }
   }
+  return { ...state, queue: newQueue, phase: 'roundTransition', currentWord: null }
 }
 // Se queue ainda tem palavras, apenas avança:
 return { ...state, queue: newQueue, currentWord: newQueue[0] }
 ```
 
-O reducer nunca chama `dispatch`. Ele recebe estado e action, e retorna novo estado diretamente. Toda transição de fase acontece via `return`. O reset de `tiebreakerFormat: null` ocorre aqui — não via `START_TIEBREAKER`.
+O reducer nunca chama `dispatch`. Ele recebe estado e action, e retorna novo estado diretamente. Toda transição de fase acontece via `return`. O reset de `tiebreakerFormat: null` e a definição de `tiebreakerTeams` ocorrem aqui.
 
 ### 8.3 Imutabilidade do Pool e Distinção Round vs Turno
 
@@ -340,15 +360,19 @@ A palavra visível no momento em que `END_TURN` é disparado **não é descartad
 
 ### 8.5 Alternância de Times por Rodada
 
-`roundStartTeam` alterna a cada `ADVANCE_ROUND`. O time que começa a Rodada N+1 é sempre o oposto do que começou a Rodada N. Essa regra tem prioridade sobre a rotação individual de jogadores.
+`teamOrder` é definido pela roleta no início da partida (e regenerado no desempate apenas com os times empatados). O time que abre a próxima rodada é sempre o **próximo na `teamOrder` ciclicamente** após o `roundStartTeam` atual. Essa regra tem prioridade sobre a rotação individual de jogadores — a unidade competitiva é o time.
+
+Com `numTeams = 2`, a regra equivale ao antigo "oposto da rodada anterior". Com `numTeams = 3` ou `4`, todos os times rodam ciclicamente.
 
 | Rodada | Time que abre |
 |--------|--------------|
-| 1 | Sorteado pela roulette |
-| 2 | Oposto ao da Rodada 1 |
-| 3 | Mesmo da Rodada 1 |
-| 4 | Mesmo da Rodada 2 |
-| Desempate | Sorteado pela roulette |
+| 1 | `teamOrder[0]` (sorteado pela roleta) |
+| 2 | Próximo cíclico na `teamOrder` após o que abriu a Rodada 1 |
+| 3 | Próximo cíclico após o que abriu a Rodada 2 |
+| 4 | Próximo cíclico após o que abriu a Rodada 3 |
+| Desempate | Novo `teamOrder` gerado pela roleta com apenas os `tiebreakerTeams`; `teamOrder[0]` abre |
+
+**Consequência:** com `numTeams = 4` em 4 rodadas, cada time abre exatamente uma rodada. Com `numTeams = 3` em 4 rodadas, um time abre duas (o que ocupa o primeiro slot da `teamOrder`).
 
 ### 8.6 Rotação de Jogadores por Time
 
@@ -373,6 +397,8 @@ O timer é responsabilidade exclusiva de `useTimer`. O reducer não sabe que o t
 
 O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remonta a cada transição de fase. O `start()` chamado no `useEffect` de montagem garante sempre o tempo cheio — não há reset explícito necessário em `TURN_CONFIRMED`. Tempo restante de turnos anteriores não acumula nem transfere.
 
+**Arquitetura interna (anti-double-fire):** o `setInterval` interno apenas atualiza `timeLeft` via updater puro. A detecção de `timeLeft === 0` e o disparo de `onEnd` vivem em um `useEffect` separado, protegido por um `endedRef` que garante invocação única. Esta separação é necessária porque React StrictMode (dev) invoca updater functions duas vezes, e callbacks impuros dentro de updaters causariam dispatch duplicado de `END_TURN`. Também blinda contra `currentWord === null` no reducer via guard em `END_TURN`.
+
 ### 8.8 Irreversibilidade da Confirmação de Palavras
 
 `PLAYER_CONFIRMED` não tem ação inversa. Uma vez confirmado, o jogador não pode editar, remover ou adicionar palavras. O reducer não implementa undo para esta action.
@@ -382,16 +408,19 @@ O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remon
 ## 9. Comportamento das Telas
 
 ### SetupScreen
-- Seletor de modo: Normal ou Temático.
+- **Título:** "Papelito" em produção; "Teste Papelito" quando `TEST_MODE === true` (ver seção 17).
+- Seletor de modo: Normal ou Temático. Em `TEST_MODE`, o botão "Temático" fica desabilitado com ícone 🔒 (cadeado).
+- Seletor de **quantidade de times**: botões `2` / `3` / `4`. Dispara `SET_NUM_TEAMS`.
 - **Ao abrir, os campos já estão preenchidos com os valores do `initialState`** — não são placeholders, são valores reais e editáveis. O usuário pode iniciar o jogo sem tocar em nada se os padrões servirem.
 - **Modo Normal:** campo numérico para `wordsPerPlayer` iniciando em `5` + campo para `turnDuration` iniciando em `60`.
 - **Modo Temático:** interface para adicionar/remover temas — inicia vazia (temas são criados pelo grupo). `wordsPerPlayer` é exibido como leitura derivada de `themes.length`, não como input. Campo para `turnDuration` iniciando em `60`.
-- Botão "Continuar" dispara `SETUP_COMPLETE`.
+- Botão "Continuar":
+  - Em modo normal: dispara `SETUP_COMPLETE`.
+  - Em `TEST_MODE`: dispara `TEST_QUICK_START` direto, pulando todo o fluxo de inserção de palavras.
 
 ### WordInputScreen
-- Exibe "Jogador N" (onde N = `wordInputCurrentIndex + 1`) no topo, com a cor `getColor(wordInputCurrentIndex)`.
-- **Campo de nome (opcional):** campo de texto "Seu nome" com placeholder `Jogador N`. Cada keystroke dispara `SET_PLAYER_NAME`. Se deixado em branco, o jogador é exibido como "Jogador N" em todo o jogo. Não bloqueia o botão Confirmar. Este `wordInputCurrentIndex` é o `playerIndex` permanente desse jogador — o mesmo valor usado em todas as `Word` que ele criar e em qualquer chamada futura a `getColor()` para exibir sua cor.
-- Toggle/seletor de time (A ou B) — obrigatório antes de liberar os campos de palavra.
+- **Header seamless:** o "Jogador N" tradicional foi substituído por um `input` transparente estilizado como título (text-2xl, font-bold) com a cor `getColor(wordInputCurrentIndex)`. O placeholder é `Jogador ${index + 1}` e herda a cor do elemento (via classe `.placeholder-inherit` em `index.css`). Cada keystroke dispara `SET_PLAYER_NAME`. Se deixado em branco, o jogador é exibido como "Jogador N" em todo o jogo. Não bloqueia o botão Confirmar. Este `wordInputCurrentIndex` é o `playerIndex` permanente desse jogador — o mesmo valor usado em todas as `Word` que ele criar e em qualquer chamada futura a `getColor()` para exibir sua cor.
+- Seletor de time — obrigatório antes de liberar os campos de palavra. Renderiza um botão por time ativo (`teamIdsFor(numTeams)`) exibindo o `TEAM_SYMBOLS[id]` grande. Layout: 2 times = 2 colunas, 3 times = 3 colunas, 4 times = grid 2×2.
 - Campos de texto: exatamente `wordsPerPlayer` campos.
 - **Edição livre:** todos os campos permanecem editáveis até o clique em Confirmar. O jogador pode alterar qualquer palavra quantas vezes quiser enquanto o dispositivo estiver com ele. Confirmar é a única ação que torna as palavras permanentes.
 - **Modo Temático:** cada campo exibe `themes[i]` como label fixo acima do input — não como placeholder. O label persiste enquanto o jogador digita. O tema correspondente é incluído automaticamente no batch do `PLAYER_CONFIRMED` via `theme: themes[i]`.
@@ -402,22 +431,26 @@ O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remon
 ### WordInputPassScreen
 - Tela de bloqueio que oculta completamente o que o jogador anterior digitou.
 - Exibe: "Passe o celular para o próximo jogador."
+- Contagem dinâmica por time: lista `TEAM_SYMBOLS[id] N` para cada `id` em `teamIdsFor(numTeams)`.
 - Botão "Próximo Jogador" — sempre visível. Dispara `NEXT_PLAYER`. `phase → 'wordInput'`.
-- Botão "Iniciar Jogo" — **renderizado condicionalmente** apenas quando `players.length >= 4 AND teams.A.playerIndices.length >= 2 AND teams.B.playerIndices.length >= 2`.
+- Botão "Iniciar Jogo" — **renderizado condicionalmente** apenas quando `players.length >= 2 * numTeams` E cada time ativo tem `playerIndices.length >= 2`.
   - Ao pressionar: abre sobreposição de confirmação (não navega de tela).
-  - Sobreposição: "Tem certeza que deseja iniciar o jogo?" + botão "Não" + botão "Sim".
-  - Botão "Sim" inicia **travado** com contador regressivo de 5 segundos visível. Só fica ativo após os 5 segundos. Implementado via `CountdownLock` component.
+  - Sobreposição: "Tem certeza que deseja iniciar o jogo?" + botão "Não" + botão "Sim, iniciar".
+  - Ambos são `Button` simples (não mais `CountdownLock` — removido por feedback de UX).
   - Ao confirmar: dispara `START_GAME`.
 
 ### RouletteScreen
-- O componente gera o time vencedor localmente via `Math.random() < 0.5 ? 'A' : 'B'` antes de iniciar a animação.
-- Exibe animação visual de roleta revelando o time sorteado.
-- Ao finalizar a animação: dispara `ROULETTE_DONE` com o valor gerado como payload.
-- Reutilizada no desempate (mesmo comportamento).
+- Determina o conjunto de times elegíveis: `tiebreakerTeams` se for desempate (`tiebreakerFormat !== null && tiebreakerTeams.length > 0`); senão `teamIdsFor(numTeams)`.
+- Gera **toda a `teamOrder`** localmente via `shuffle([...eligibleIds])` antes de iniciar a animação (padrão `useRef`). `firstTeam = teamOrder[0]`.
+- A animação cicla entre os símbolos dos times elegíveis com `SPIN_DELAYS` decrescentes (slot machine), aterrissando em `firstTeam`.
+- Após o pouso, exibe "{símbolo} começa!" e logo abaixo, se houver mais de 1 time, "Ordem: ■ → ▲ → ★" mostrando a `teamOrder` completa.
+- Dispara `ROULETTE_DONE` com payload `{ teamOrder, firstTeam }`.
+- Reutilizada no desempate, automaticamente filtrando para os times empatados.
 
 ### TurnPassScreen
-- Exibe: "Vez do Time [X]" com a cor do time.
-- Exibe o placar atual (`ScoreBoard`).
+- Exibe `TEAM_SYMBOLS[currentTeamId]` gigante em branco (símbolos são neutros — não há cores de time).
+- Exibe o nome do jogador (`players[currentPlayerIndex].name` com fallback `Jogador N`) na cor `getColor(currentPlayerIndex)`.
+- Exibe o placar atual (`ScoreBoard`), com o time atual destacado via prop `highlight`.
 - Exibe `RoundBadge` com as regras da rodada ativa: usa `ROUNDS[tiebreakerFormat]` quando `tiebreakerFormat !== null`, e `ROUNDS[round]` nos demais casos — mesma lógica do `TurnScreen`.
 - Botão "Estou pronto" — **sempre visível**. Não há lógica de visibilidade por jogador. O jogo parte do pressuposto social de que o dispositivo já está nas mãos do jogador correto do time indicado. Dispara `TURN_CONFIRMED`.
 
@@ -444,15 +477,22 @@ O timer reinicia integralmente a cada turno porque `TurnScreen` desmonta e remon
 - Reutiliza os mesmos `SPIN_DELAYS` da `RouletteScreen`.
 
 ### TiebreakerScreen
-- Exibe mensagem de empate com placar.
+- Exibe mensagem listando os times empatados via `tiebreakerTeams.map(id => TEAM_SYMBOLS[id]).join(' e ')` + score compartilhado.
+- Exibe `ScoreBoard` com todos os times (não filtra — apenas os empatados disputam, mas os scores de todos são visíveis).
 - Botão "Sortear formato" → dispara `RANDOMIZE_TIEBREAKER_FORMAT`.
 - Quatro botões de formato (Livre, Uma Palavra, Mímica, Som) → cada um dispara `SELECT_TIEBREAKER_FORMAT` com o valor correspondente (1, 2, 3, 4).
 - Botão "Aceitar Empate" → dispara `GAME_OVER` diretamente. Encerra o jogo com resultado de empate sem jogar mais.
+- A `RouletteScreen` subsequente automaticamente filtra apenas os `tiebreakerTeams`.
 
 ### ResultsScreen
-- Exibe placar final de ambos os times.
-- Exibe o time vencedor em destaque.
-- Botão "Nova Partida" → usa `CountdownLock` de 5 segundos. Ao confirmar: dispara `RESET_GAME`, que retorna o estado para `initialState` e navega para `setup`. O localStorage já foi limpo automaticamente pelo `GameContext` ao entrar em `gameOver`.
+- Determina vitória e empate dinamicamente:
+  - `ranked = teamIdsFor(numTeams).map(id => ({ id, score })).sort((a,b) => b.score - a.score)`
+  - `maxScore = ranked[0].score`
+  - `winners = ranked.filter(t => t.score === maxScore)`
+  - Empate quando `winners.length > 1`.
+- Exibe troféu 🏆 + símbolo do vencedor isolado, OU 🤝 + símbolos empatados.
+- Exibe **ranking ordenado por score** — uma linha por time com posição (1º, 2º…), `TEAM_SYMBOLS[id]` e score. O 1º colocado tem borda branca quando não há empate no topo.
+- Botão "Nova Partida" → `Button` simples (não mais `CountdownLock`). Dispara `RESET_GAME`, que retorna o estado para `initialState` e navega para `setup`. O localStorage já foi limpo automaticamente pelo `GameContext` ao entrar em `gameOver`.
 
 ---
 
@@ -488,23 +528,60 @@ const ROUNDS = {
 ## 11. Sistema de Cores dos Jogadores
 
 ```javascript
-// utils/colors.js
+// utils/colors.js — 12 cores distintas, suficientes para 4 times × 3 jogadores sem repetição.
+// Ordem alternada por matiz para reduzir colisão visual entre jogadores consecutivos.
 const PLAYER_COLORS = [
-  '#22c55e',  // verde
-  '#3b82f6',  // azul
-  '#f97316',  // laranja
-  '#a855f7',  // roxo
-  '#ec4899',  // rosa
-  '#eab308',  // amarelo
-  '#06b6d4',  // ciano
-  '#ef4444',  // vermelho
+  '#22c55e',  // 0  verde
+  '#3b82f6',  // 1  azul
+  '#f97316',  // 2  laranja
+  '#a855f7',  // 3  roxo
+  '#ec4899',  // 4  rosa
+  '#eab308',  // 5  amarelo
+  '#06b6d4',  // 6  ciano
+  '#ef4444',  // 7  vermelho
+  '#84cc16',  // 8  lima
+  '#6366f1',  // 9  índigo
+  '#14b8a6',  // 10 teal
+  '#d97706',  // 11 âmbar
 ]
 
 export const getColor = (playerIndex) =>
   PLAYER_COLORS[playerIndex % PLAYER_COLORS.length]
 ```
 
-A cor de um jogador é sempre derivada de `getColor(player.index)`. Nunca armazenada como estado — é computada sob demanda. O `% PLAYER_COLORS.length` garante que, se houver mais jogadores do que cores, as cores reiniciam ciclicamente.
+A cor de um jogador é sempre derivada de `getColor(player.index)`. Nunca armazenada como estado — é computada sob demanda. O `% PLAYER_COLORS.length` garante que, se houver mais jogadores do que cores (>12), as cores reiniciam ciclicamente.
+
+---
+
+## 11.1 Sistema de Times
+
+```javascript
+// utils/teams.js
+export const TEAM_IDS = ['A', 'B', 'C', 'D']
+
+export const TEAM_SYMBOLS = {
+  A: '■',  // quadrado
+  B: '●',  // círculo
+  C: '▲',  // triângulo
+  D: '★',  // estrela
+}
+
+export const teamIdsFor = (numTeams) => TEAM_IDS.slice(0, numTeams)
+
+export const buildTeams = (numTeams) => {
+  const result = {}
+  for (const id of teamIdsFor(numTeams)) {
+    result[id] = { score: 0, playerIndices: [], queuePos: 0 }
+  }
+  return result
+}
+```
+
+**Convenções:**
+- IDs internos são sempre as letras `A..D`. Toda exibição usa `TEAM_SYMBOLS[id]`.
+- **Times não têm cor.** A diferenciação visual entre times é feita exclusivamente pelos símbolos. Isso libera a paleta de cores integralmente para jogadores e evita colisão visual entre cor de time × cor de jogador.
+- `numTeams` é fixado no `SetupScreen` e nunca muda durante a partida.
+- A ordem de jogada (`teamOrder`) é sorteada pela `RouletteScreen` e armazenada em `state.teamOrder`. O `ScoreBoard` renderiza os times nessa ordem.
 
 ---
 
@@ -645,5 +722,65 @@ Em um jogo pass-and-play com um único dispositivo, permitir edição após conf
 **Por que a alternância de times tem prioridade sobre a rotação de jogadores?**
 A pontuação é acumulada por time, não por jogador. A unidade competitiva é o time. Garantir que cada time abra o mesmo número de rodadas é mais justo do que garantir que cada jogador jogue o mesmo número de turnos.
 
+**Por que times usam símbolos e não cores?**
+Com até 4 times × 3 jogadores, são 12 cores ocupadas. Adicionar cor de time sobre cor de jogador criaria sobreposição visual confusa (jogador verde do time azul, jogador amarelo do time laranja…). Símbolos (■ ● ▲ ★) são monocromáticos, universalmente reconhecíveis e não competem com o sistema de cores dos jogadores.
+
+**Por que `teamOrder` é sorteado em vez de definido manualmente pelo grupo?**
+Em uma versão inicial considerou-se uma `TeamOrderScreen` tap-to-pick. Foi abandonada porque (a) randomização é mais justa — elimina viés de "quem joga primeiro define o ritmo", (b) remove uma tela do fluxo, e (c) a roleta já entrega o suspense esperado. O grupo não perde agência relevante: a ordem só afeta sequência de turnos, não regras nem pontuação.
+
 **Por que getColor deriva a cor do índice em vez de armazenar no estado?**
 Cores são uma função determinística do índice. Armazenar informação que pode ser computada aumenta a superfície do estado sem necessidade, e cria risco de dessincronização entre o índice e a cor armazenada.
+
+---
+
+## 17. Modo de Teste
+
+`src/utils/dev.js` controla um modo que pula o setup de jogadores e palavras, gerando estado completo automaticamente e indo direto pra roleta.
+
+### 17.1 Persistência da flag
+
+O estado do `TEST_MODE` vive em `localStorage` sob a chave `'papelito_test_mode'`, persistindo entre sessões. Para usuários que nunca alternaram, a constante interna `DEFAULT_TEST_MODE` (em `dev.js`) define o valor padrão — deve ser `false` em produção.
+
+```javascript
+export const isTestMode = () => { /* lê localStorage com fallback DEFAULT_TEST_MODE */ }
+export const setTestMode = (value) => { /* persiste em localStorage */ }
+```
+
+A `SetupScreen` lê o estado uma vez na montagem via `useState(() => isTestMode())` e mantém uma cópia local que reage ao toggle.
+
+### 17.2 Combo secreto de toggle
+
+Como não há UI dedicada para alternar o modo (intencional — é um atalho de dev), o toggle acontece via combo de valores no Setup:
+
+```javascript
+export const TOGGLE_COMBO = {
+  numTeams: 4,
+  turnDuration: 44,
+  wordsPerPlayer: 4,
+}
+```
+
+Quando o usuário clica em "Continuar" com **todos esses três valores ativos simultaneamente**, em vez de iniciar a partida o app:
+1. Alterna o `TEST_MODE` (chama `setTestMode(!current)`).
+2. Atualiza o state local da `SetupScreen` (título e cadeado refletem imediatamente).
+3. Exibe um toast no rodapé: "Modo de teste ativado" ou "Modo de teste desativado", auto-dismissado em 2 segundos.
+4. **Não dispara** `SETUP_COMPLETE` nem `TEST_QUICK_START` — o usuário precisa ajustar os valores e clicar de novo para iniciar.
+
+O combo exige 3 mudanças deliberadas (default é `2 / 60 / 5`), tornando colisão acidental improvável.
+
+### 17.3 Efeitos quando ativado
+
+1. **SetupScreen:** título vira "Teste Papelito"; botão "Temático" fica desabilitado com 🔒 (cadeado). Modo é forçado para normal.
+2. **Botão "Continuar":** dispara `TEST_QUICK_START` em vez de `SETUP_COMPLETE` (exceto quando o combo está aplicado — nesse caso, apenas alterna a flag).
+3. **Action `TEST_QUICK_START`:**
+   - Força `mode: 'normal'`, `themes: []`.
+   - Cria `2 × numTeams` jogadores nomeados `Teste 1`, `Teste 2`, ..., distribuídos circularmente entre os times (`teamIds[i % numTeams]`).
+   - Popula o `pool` com `wordsPerPlayer` palavras por jogador, sorteadas de um shuffle de `FAKE_WORDS`. Se o pool fake esgotar, anexa sufixo numérico (`Banana 2`, `Cadeira 2`, etc).
+   - `wordInputCurrentIndex = totalPlayers - 1` (último jogador).
+   - `phase → 'roulette'`.
+
+### 17.4 Disclaimers
+
+- Modo de teste **não** é uma feature de produção — é puramente para acelerar iterações de desenvolvimento. Como vive em localStorage, um usuário curioso que descobrir o combo pode ativá-lo, mas o impacto é limitado (apenas pula o setup; o jogo funciona normalmente).
+- O fluxo de validação de `START_GAME` é pulado: `TEST_QUICK_START` confia que `2 × numTeams >= 2 * 2` (sempre verdadeiro) e que cada time terá exatamente 2 jogadores (sempre verdadeiro pela distribuição).
+- A chave `'papelito_test_mode'` é separada da chave `'papelito_game_state'` do save de partida — alternar TEST_MODE não afeta partidas em andamento.

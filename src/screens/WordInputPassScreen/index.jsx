@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import Button from '../../components/Button/index.jsx'
+import { TEAM_SYMBOLS, teamIdsFor } from '../../utils/teams.js'
 
 const WordInputPassScreen = () => {
   const { state, dispatch } = useGame()
-  const { players, teams } = state
+  const { players, teams, numTeams } = state
   const [showConfirm, setShowConfirm] = useState(false)
+  const teamIds = teamIdsFor(numTeams)
 
   const canStart =
-    players.length >= 4 &&
-    teams.A.playerIndices.length >= 2 &&
-    teams.B.playerIndices.length >= 2
+    players.length >= 2 * numTeams &&
+    teamIds.every(id => teams[id].playerIndices.length >= 2)
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
@@ -20,8 +21,9 @@ const WordInputPassScreen = () => {
         </p>
         <p className="text-zinc-400 text-sm">
           {players.length} {players.length === 1 ? 'jogador' : 'jogadores'} cadastrado{players.length === 1 ? '' : 's'}
-          {' · '}Time A: {teams.A.playerIndices.length}
-          {' · '}Time B: {teams.B.playerIndices.length}
+        </p>
+        <p className="text-zinc-400 text-sm mt-1">
+          {teamIds.map(id => `${TEAM_SYMBOLS[id]} ${teams[id].playerIndices.length}`).join('  ·  ')}
         </p>
       </div>
 

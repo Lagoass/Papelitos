@@ -1,18 +1,16 @@
 import { useGame } from '../../store/GameContext.jsx'
 import { getColor } from '../../utils/colors.js'
-import { TEAM_COLORS } from '../../components/ScoreBoard/index.jsx'
+import { TEAM_SYMBOLS } from '../../utils/teams.js'
 import ScoreBoard from '../../components/ScoreBoard/index.jsx'
 import RoundBadge from '../../components/RoundBadge/index.jsx'
 import Button from '../../components/Button/index.jsx'
 
 const TurnPassScreen = () => {
   const { state, dispatch } = useGame()
-  const { currentTeamId, teams, round, tiebreakerFormat } = state
+  const { currentTeamId, teams, round, tiebreakerFormat, players } = state
 
-  const { players } = state
   const team = teams[currentTeamId]
   const currentPlayerIndex = team.playerIndices[team.queuePos % team.playerIndices.length]
-  const teamColor = TEAM_COLORS[currentTeamId]
   const playerColor = getColor(currentPlayerIndex)
   const playerName = players[currentPlayerIndex]?.name?.trim() || `Jogador ${currentPlayerIndex + 1}`
 
@@ -21,10 +19,10 @@ const TurnPassScreen = () => {
       {/* Indicador de time e jogador */}
       <div className="text-center pt-4">
         <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Próximo turno</p>
-        <p className="text-4xl font-black" style={{ color: teamColor }}>
-          Time {currentTeamId}
+        <p className="text-7xl font-black leading-none">
+          {TEAM_SYMBOLS[currentTeamId]}
         </p>
-        <p className="text-sm mt-2" style={{ color: playerColor }}>
+        <p className="text-sm mt-3" style={{ color: playerColor }}>
           {playerName}
         </p>
       </div>

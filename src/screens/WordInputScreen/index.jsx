@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import { getColor } from '../../utils/colors.js'
+import { TEAM_SYMBOLS, teamIdsFor } from '../../utils/teams.js'
 import Button from '../../components/Button/index.jsx'
 
 const WordInputScreen = () => {
   const { state, dispatch } = useGame()
-  const { wordInputCurrentIndex, wordsPerPlayer, themes, mode } = state
+  const { wordInputCurrentIndex, wordsPerPlayer, themes, mode, numTeams } = state
+  const teamIds = teamIdsFor(numTeams)
+  // Grid: 2 times = 2 colunas linha única, 3 times = 3 colunas linha única, 4 times = grid 2x2
+  const teamGridCols = numTeams === 3 ? 'grid-cols-3' : 'grid-cols-2'
   const color = getColor(wordInputCurrentIndex)
 
   const [fields, setFields] = useState(() => Array(wordsPerPlayer).fill(''))
@@ -92,16 +96,16 @@ const WordInputScreen = () => {
       {/* Seletor de time */}
       <section className="mb-6">
         <p className="text-xs text-zinc-400 uppercase tracking-widest mb-2">Seu time</p>
-        <div className="flex gap-3">
-          {['A', 'B'].map(id => (
+        <div className={`grid ${teamGridCols} gap-3`}>
+          {teamIds.map(id => (
             <button
               key={id}
               onClick={() => handleTeamSelect(id)}
-              className={`flex-1 py-3 rounded-xl font-bold text-lg transition-colors ${
+              className={`py-3 rounded-xl font-bold text-2xl transition-colors ${
                 teamId === id ? 'bg-white text-black' : 'bg-zinc-800 text-white'
               }`}
             >
-              Time {id}
+              {TEAM_SYMBOLS[id]}
             </button>
           ))}
         </div>
