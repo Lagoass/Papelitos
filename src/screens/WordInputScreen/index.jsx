@@ -84,7 +84,7 @@ const WordInputScreen = () => {
           value={name}
           onChange={e => handleNameChange(e.target.value)}
           placeholder={`Jogador ${wordInputCurrentIndex + 1}`}
-          className="w-full bg-transparent text-2xl font-bold focus:outline-none"
+          className="w-full bg-transparent text-2xl font-bold focus:outline-none placeholder-inherit"
           style={{ color }}
         />
       </div>
