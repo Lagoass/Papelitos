@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 // Splash interno renderizado nos primeiros ms após a montagem do App.
 // - Suaviza a transição do splash nativo do Android (icone rígido) para a UI.
 // - Duração aleatória entre MIN_MS e MAX_MS — orgânico, não parece script fixo.
-// - Logo com border-radius arredondado + fade-out + leve scale-up no final.
+// - Logo com border-radius arredondado + spinner girando + fade-out no final.
+// - NÃO é renderizado quando há partida salva em andamento (ver App.jsx).
 
-const MIN_MS = 200
-const MAX_MS = 1000
-const FADE_MS = 250
+const MIN_MS = 800
+const MAX_MS = 2000
+const FADE_MS = 300
 
 const SplashScreen = ({ onDone }) => {
   const [fading, setFading] = useState(false)
@@ -24,7 +25,7 @@ const SplashScreen = ({ onDone }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black transition-opacity duration-300 ${
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
@@ -40,6 +41,12 @@ const SplashScreen = ({ onDone }) => {
           draggable={false}
         />
       </div>
+      {/* Spinner — bolinha girando abaixo do logo */}
+      <div
+        className={`mt-10 w-8 h-8 rounded-full border-2 border-zinc-700 border-t-white animate-spin transition-opacity duration-300 ${
+          fading ? 'opacity-0' : 'opacity-100'
+        }`}
+      />
     </div>
   )
 }

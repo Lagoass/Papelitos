@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useGame } from './store/GameContext.jsx'
+import { STORAGE_KEY, deserialize } from './utils/storage.js'
 import SetupScreen from './screens/SetupScreen/index.jsx'
 import WordInputScreen from './screens/WordInputScreen/index.jsx'
 import WordInputPassScreen from './screens/WordInputPassScreen/index.jsx'
@@ -39,10 +40,26 @@ const PHASE_SCREENS = {
   gameOver:        ResultsScreen,
 }
 
+// Detecta sincronicamente se há partida em andamento no localStorage.
+// Usado para decidir se o SplashScreen deve aparecer (só mostra quando
+// o app está abrindo "do zero" — sem partida pra retomar).
+const hasOngoingGame = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return false
+    const saved = deserialize(raw)
+    return !!saved && saved.phase !== 'setup' && saved.phase !== 'gameOver'
+  } catch {
+    return false
+  }
+}
+
 const App = () => {
   const { state, dispatch, load, clear } = useGame()
   const [savedState, setSavedState] = useState(null)
-  const [splashing, setSplashing] = useState(true)
+  // Splash só aparece em abertura "limpa" — partida em andamento pula direto
+  // pro ResumeModal pra não atrasar o retorno do usuário ao jogo.
+  const [splashing, setSplashing] = useState(() => !hasOngoingGame())
 
   // Load único na montagem — seção 12
   useEffect(() => {
