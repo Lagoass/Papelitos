@@ -10,6 +10,7 @@ import RoundTransitionScreen from './screens/RoundTransitionScreen/index.jsx'
 import TiebreakerScreen from './screens/TiebreakerScreen/index.jsx'
 import FormatRouletteScreen from './screens/FormatRouletteScreen/index.jsx'
 import ResultsScreen from './screens/ResultsScreen/index.jsx'
+import SplashScreen from './screens/SplashScreen/index.jsx'
 import Button from './components/Button/index.jsx'
 
 const ResumeModal = ({ savedPhase, onResume, onNew }) => (
@@ -41,6 +42,7 @@ const PHASE_SCREENS = {
 const App = () => {
   const { state, dispatch, load, clear } = useGame()
   const [savedState, setSavedState] = useState(null)
+  const [splashing, setSplashing] = useState(true)
 
   // Load único na montagem — seção 12
   useEffect(() => {
@@ -72,6 +74,7 @@ const App = () => {
           onNew={handleNewGame}
         />
       )}
+      {splashing && <SplashScreen onDone={() => setSplashing(false)} />}
     </>
   )
 }

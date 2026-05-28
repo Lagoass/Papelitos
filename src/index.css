@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Garante que html, body e #root cobrem todo o viewport com a mesma cor
+   — elimina a "costura" entre safe-area (controlada pelo html/theme-color)
+   e o conteúdo (body). */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #000000;
+}
+
 .placeholder-inherit::placeholder {
   color: inherit;
   opacity: 1;
@@ -13,7 +24,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 /* ── Synthwave ── deep violet + magenta/teal accents */
-body.theme-synthwave { background-color: #0f0820; }
+html.theme-synthwave, body.theme-synthwave { background-color: #0f0820; }
 body.theme-synthwave .bg-black,
 body.theme-synthwave .bg-black\/95 { background-color: #0f0820 !important; }
 body.theme-synthwave .bg-zinc-800 { background-color: #1a0f3a !important; }
@@ -29,7 +40,7 @@ body.theme-synthwave .text-black { color: #2d1b5e !important; }
 body.theme-synthwave .border-white { border-color: #f0abfc !important; }
 
 /* ── Minimal ── quase preto + amarelo elétrico */
-body.theme-minimal { background-color: #09090b; }
+html.theme-minimal, body.theme-minimal { background-color: #09090b; }
 body.theme-minimal .bg-black,
 body.theme-minimal .bg-black\/95 { background-color: #09090b !important; }
 body.theme-minimal .bg-zinc-800 { background-color: #18181b !important; }
@@ -44,7 +55,7 @@ body.theme-minimal .text-black { color: #09090b !important; }
 body.theme-minimal .border-white { border-color: #facc15 !important; }
 
 /* ── Casino ── emerald + amber */
-body.theme-casino { background-color: #052e16; }
+html.theme-casino, body.theme-casino { background-color: #052e16; }
 body.theme-casino .bg-black,
 body.theme-casino .bg-black\/95 { background-color: #052e16 !important; }
 body.theme-casino .bg-zinc-800 { background-color: #14532d !important; }
@@ -60,7 +71,7 @@ body.theme-casino .text-black { color: #052e16 !important; }
 body.theme-casino .border-white { border-color: #fbbf24 !important; }
 
 /* ── Junina ── maroon + amber + cyan toques */
-body.theme-junina { background-color: #1c0a0a; }
+html.theme-junina, body.theme-junina { background-color: #1c0a0a; }
 body.theme-junina .bg-black,
 body.theme-junina .bg-black\/95 { background-color: #1c0a0a !important; }
 body.theme-junina .bg-zinc-800 { background-color: #450a0a !important; }
@@ -76,7 +87,7 @@ body.theme-junina .text-black { color: #450a0a !important; }
 body.theme-junina .border-white { border-color: #fcd34d !important; }
 
 /* ── Light ── cream + dark text + orange accent */
-body.theme-light { background-color: #fef9f0; }
+html.theme-light, body.theme-light { background-color: #fef9f0; }
 body.theme-light .bg-black,
 body.theme-light .bg-black\/95 { background-color: #fef9f0 !important; }
 body.theme-light .bg-zinc-800 { background-color: #f5ede0 !important; }

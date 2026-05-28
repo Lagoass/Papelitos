@@ -28,10 +28,14 @@ export const applyTheme = (id) => {
     localStorage.setItem(THEME_KEY, id)
   } catch {}
   if (typeof document !== 'undefined') {
-    document.body.classList.forEach(cls => {
-      if (cls.startsWith('theme-')) document.body.classList.remove(cls)
-    })
-    document.body.classList.add(`theme-${id}`)
+    // Aplica em html E body — html cobre a safe-area do recorte da câmera,
+    // body cobre o conteúdo. Sem isso, há uma "costura" visível no topo.
+    for (const el of [document.documentElement, document.body]) {
+      el.classList.forEach(cls => {
+        if (cls.startsWith('theme-')) el.classList.remove(cls)
+      })
+      el.classList.add(`theme-${id}`)
+    }
   }
 }
 
