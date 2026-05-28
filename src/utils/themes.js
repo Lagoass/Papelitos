@@ -4,12 +4,12 @@
 const THEME_KEY = 'papelito_theme'
 
 export const THEMES = [
-  { id: 'mono',      label: 'Mono' },
-  { id: 'synthwave', label: 'Synthwave' },
-  { id: 'minimal',   label: 'Minimal' },
-  { id: 'casino',    label: 'Casino' },
-  { id: 'junina',    label: 'Junina' },
-  { id: 'light',     label: 'Light' },
+  { id: 'mono',      label: 'Mono',      bg: '#000000' },
+  { id: 'synthwave', label: 'Synthwave', bg: '#0f0820' },
+  { id: 'minimal',   label: 'Minimal',   bg: '#09090b' },
+  { id: 'casino',    label: 'Casino',    bg: '#052e16' },
+  { id: 'junina',    label: 'Junina',    bg: '#1c0a0a' },
+  { id: 'light',     label: 'Light',     bg: '#fef9f0' },
 ]
 
 export const DEFAULT_THEME = 'mono'
@@ -35,6 +35,19 @@ export const applyTheme = (id) => {
         if (cls.startsWith('theme-')) el.classList.remove(cls)
       })
       el.classList.add(`theme-${id}`)
+    }
+    // Sincroniza o <meta name="theme-color"> com o bg do tema.
+    // Em alguns Androids, a safe-area da câmera é pintada com esse valor —
+    // se ficar diferente do body, surge uma "linha cinza" no topo.
+    const theme = THEMES.find(t => t.id === id)
+    if (theme) {
+      let meta = document.querySelector('meta[name="theme-color"]')
+      if (!meta) {
+        meta = document.createElement('meta')
+        meta.name = 'theme-color'
+        document.head.appendChild(meta)
+      }
+      meta.content = theme.bg
     }
   }
 }
