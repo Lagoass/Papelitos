@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import Button from '../../components/Button/index.jsx'
+import InstallBanner from '../../components/InstallBanner/index.jsx'
 import { isTestMode, setTestMode, matchesToggleCombo } from '../../utils/dev.js'
 import SettingsScreen from '../SettingsScreen/index.jsx'
 
@@ -221,6 +222,9 @@ const SetupScreen = () => {
 
       {/* Overlay de configurações */}
       {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
+
+      {/* Banner de instalação do PWA — só aparece se instalável e não dispensado */}
+      <InstallBanner />
     </div>
   )
 }

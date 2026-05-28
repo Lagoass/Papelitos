@@ -58,6 +58,7 @@ papelito/
 │   │   ├── ScoreBoard/             → placar em tempo real dos dois times
 │   │   ├── RoundBadge/             → ícone + nome da rodada atual
 │   │   ├── Button/                 → botão padrão reutilizável
+│   │   ├── InstallBanner/          → banner dismissível com prompt de instalação do PWA (ver seção 19)
 │   │   └── CountdownLock/          → botão com travamento regressivo. Recebe `seconds: number` como prop (padrão: `5`). Usado com `seconds={5}` em todos os contextos atuais.
 │   │
 │   ├── store/
@@ -68,6 +69,7 @@ papelito/
 │   ├── hooks/
 │   │   ├── useTimer.js             → lógica do cronômetro (start, pause, reset, onEnd)
 │   │   ├── useWakeLock.js          → Wake Lock API — impede a tela de apagar durante o turno
+│   │   ├── useInstallPrompt.js     → captura beforeinstallprompt + detecta iOS/standalone (ver seção 19)
 │   │   └── useLocalStorage.js      → abstração de save/load/clear do GameState
 │   │
 │   ├── utils/
@@ -681,7 +683,8 @@ export default defineConfig({
         description:      'O jogo de palavras em 4 rodadas',
         theme_color:      '#000000',
         background_color: '#000000',
-        display:          'standalone',
+        display:          'fullscreen',
+        display_override: ['fullscreen', 'standalone', 'minimal-ui'],
         orientation:      'portrait',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -848,3 +851,80 @@ Os componentes continuam usando as classes Tailwind padrão (`bg-black`, `bg-zin
 Array de objetos `{ title, body }` com as regras do jogo em formato curto, adequado para leitura mobile. É a versão "exibível" do `rules.md` (que serve como referência humana mais longa). Conteúdo cobre: o que é o Papelito, jogadores e times, modos Normal vs Temático, dinâmica de turno, as 4 rodadas, ordem dos times, rotação de jogadores, vitória e empate, persistência.
 
 Adicionar/remover/editar regras é puro — basta editar o array; o accordion se reconstrói automaticamente.
+
+---
+
+## 19. PWA Fullscreen e Prompt de Instalação
+
+### 19.1 Fullscreen real
+
+O manifest usa `display: 'fullscreen'` com `display_override: ['fullscreen', 'standalone', 'minimal-ui']`. Quando o app é aberto pelo ícone na tela inicial (instalado como PWA), o navegador esconde:
+- Address bar do Chrome/Samsung Internet
+- Barra de status do sistema
+- **Botões de navegação do Android** (voltar, home, recentes) — incluindo os do Samsung
+
+`display_override` fornece uma lista ordenada de fallbacks para dispositivos que não suportem fullscreen completo.
+
+**Limitação intransponível:** essas regras só valem quando o app está rodando standalone (instalado). Em uma aba normal de browser, a address bar e os controles do sistema permanecem visíveis — é uma decisão de segurança do Chrome/Safari, não há contorno técnico. Por isso o prompt de instalação (seção 19.3) é parte essencial da experiência.
+
+### 19.2 Meta tags em `index.html`
+
+```html
+<meta name="viewport" content="...,viewport-fit=cover" />
+<meta name="theme-color" content="#000000" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Papelito" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+```
+
+- `viewport-fit=cover`: permite que o conteúdo se estenda sob notches e safe areas
+- Tags `apple-*`: equivalentes iOS do manifest (Safari não lê o `manifest.json` para PWA fullscreen)
+- `apple-touch-icon`: ícone usado quando o usuário adiciona à tela inicial pelo iOS
+
+### 19.3 Hook `useInstallPrompt`
+
+```javascript
+const { canShow, ios, installed, dismissed, promptInstall, dismiss } = useInstallPrompt()
+```
+
+Responsabilidades:
+- Escuta `beforeinstallprompt` (Chrome/Edge/Samsung Internet) — armazena o evento em state com `e.preventDefault()` para poder disparar manualmente depois.
+- Escuta `appinstalled` — marca como instalado e limpa o evento.
+- Detecta iOS via UA — Safari não dispara `beforeinstallprompt`, então a flag `ios` sinaliza necessidade de instruções manuais.
+- Detecta se já roda standalone via `matchMedia('(display-mode: standalone)')` e variantes — esconde o banner quando o app já está instalado.
+- Persiste dismissal em `localStorage` sob chave separada `'papelito_install_dismissed'`.
+
+`canShow` é verdadeiro quando: não está rodando standalone, não foi dispensado, **e** (há evento nativo disponível **ou** é iOS).
+
+`promptInstall()` dispara o prompt nativo e retorna `'accepted' | 'dismissed'` do `userChoice`.
+
+### 19.4 Componente `InstallBanner`
+
+Renderizado no fim da `SetupScreen` (após `SettingsScreen`), posição `fixed bottom-4 left-4 right-4 z-40`. Aparece apenas quando `canShow === true`.
+
+Estrutura: título "Instalar Papelito" + descrição curta + botão ✕ de dispensa + botão "Instalar".
+
+Fluxo por plataforma:
+- **Android (Chrome/Samsung Internet):** clique em "Instalar" → `promptInstall()` dispara o prompt nativo do sistema. Se o usuário dispensar, marca como `dismissed`.
+- **iOS Safari:** clique em "Instalar" → abre modal de instruções (`IOSInstructions`) com passo-a-passo: Compartilhar ⬆️ → Adicionar à Tela de Início → Adicionar.
+
+### 19.5 Chaves de localStorage usadas pelo app
+
+| Chave | Conteúdo | Reset |
+|-------|----------|-------|
+| `papelito_game_state` | GameState serializado da partida em andamento | Limpa em `gameOver` |
+| `papelito_test_mode` | `'1'` quando TEST_MODE ativo | Toggle via combo secreto |
+| `papelito_theme` | ID do tema ativo (`mono`, `synthwave`, etc) | Trocado via SettingsScreen |
+| `papelito_install_dismissed` | `'1'` quando o usuário dispensou o banner de instalação | Não há reset programático — usuário precisa limpar manualmente |
+
+Todas as chaves são independentes — mexer em uma nunca afeta as outras.
+
+### 19.6 Como verificar em desenvolvimento
+
+PWA install só funciona em build de produção servida por HTTPS:
+1. `npm run build && npm run preview` localmente, ou
+2. Deploy no Cloudflare Pages (já HTTPS por default).
+
+Critérios mínimos do Chrome para disparar `beforeinstallprompt`: manifest válido, service worker registrado, ícone 192px e 512px, servido em HTTPS, usuário interagiu com a página por pelo menos 30 segundos. O `vite-plugin-pwa` já garante manifest e service worker.

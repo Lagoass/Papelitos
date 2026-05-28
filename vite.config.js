@@ -13,7 +13,8 @@ export default defineConfig({
         description:      'O jogo de palavras em 4 rodadas',
         theme_color:      '#000000',
         background_color: '#000000',
-        display:          'standalone',
+        display:          'fullscreen',
+        display_override: ['fullscreen', 'standalone', 'minimal-ui'],
         orientation:      'portrait',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
