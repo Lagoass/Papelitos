@@ -11,6 +11,30 @@
     <title>Papelito</title>
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <script>
+      // Aplica tema salvo o mais cedo possível — antes do bundle carregar.
+      // Sem isso, o Android pode "travar" a cor da safe-area no theme-color
+      // padrão (#000000) na primeira renderização, criando uma linha visível
+      // entre safe-area preta e body colorido em temas não-preto.
+      (function () {
+        try {
+          var THEMES = {
+            mono:      '#000000',
+            synthwave: '#0f0820',
+            minimal:   '#09090b',
+            casino:    '#052e16',
+            junina:    '#1c0a0a',
+            light:     '#fef9f0',
+          }
+          var id = localStorage.getItem('papelito_theme') || 'mono'
+          var bg = THEMES[id] || THEMES.mono
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', bg)
+          document.documentElement.classList.add('theme-' + id)
+          document.documentElement.style.backgroundColor = bg
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
