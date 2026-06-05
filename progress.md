@@ -145,6 +145,32 @@ Fase 4 concluída. Implementação do jogo completa. Pendências antes do deploy
 
 ---
 
+## Fase 5 — Rotação Justa de Jogadores (least-turns)
+
+**Status:** `[x] Concluída`
+**Data de conclusão:** 2026-05-27
+
+### Motivação
+O esquema antigo (`queuePos` incremental por time, com bump no `ADVANCE_ROUND` e congelamento no fechamento via HIT) distribuía turnos de forma injusta dentro de times de tamanho ímpar — em cenários de rodadas curtas, um membro de um time de 3 podia ser descritor **zero vezes no jogo inteiro**. Análise por simulação confirmou spread interno de até 4 turnos.
+
+### O que mudou
+- [x] `utils/teams.js` — `buildTeams` não cria mais `queuePos`.
+- [x] `store/initialState.js` — `teams` sem `queuePos`; novos campos globais `currentPlayerIndex` e `turnSeq`.
+- [x] Player ganha `turns` (default 0) e `lastPlayed` (default -1), criados em SETUP_COMPLETE, NEXT_PLAYER e TEST_QUICK_START.
+- [x] `store/gameReducer.js` — helpers `pickDescriber` (escolhe o membro do time com menos turnos; empate → `lastPlayed` → índice) e `creditTurn` (credita o descritor no fim do turno). Aplicados em ROULETTE_DONE, HIT (fecho), END_TURN, ADVANCE_ROUND. Removidos todos os `queuePos++` e o bump.
+- [x] `LOAD_GAME` normaliza saves antigos (defaults dos campos novos + recomputa `currentPlayerIndex`).
+- [x] `screens/TurnPassScreen/index.jsx` — descritor vem de `state.currentPlayerIndex` (não mais de `queuePos % len`).
+- [x] `content.md` — seção 8.6 reescrita; tipos/GameState/actions atualizados; seção 20 (plano) removida.
+
+### Validação
+Teste de integração dirigindo o reducer real em 9 configurações (2–4 times, 4–11 jogadores) × 4 ritmos: spread interno ≤ 1 sempre, ninguém zerado, e `Σ players.turns === turnSeq` (crédito consistente). Build de produção limpo.
+
+### Decisões de design
+- A escolha do descritor considera **só `turns` (oportunidade), nunca palavras acertadas (habilidade)** — para não punir o bom descritor nem premiar o fraco com turnos extras. Políticas baseadas em palavras (least-words / híbrido) foram descartadas por esse motivo após simulação com habilidade modelada.
+- Times de tamanho desigual continuam com membros do time maior descrevendo menos no total (por design — turnos alocados por time). A rotação só equaliza dentro do time.
+
+---
+
 ## Notas Gerais
 
 ### Padrões adotados ao longo do projeto

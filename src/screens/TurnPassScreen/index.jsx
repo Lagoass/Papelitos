@@ -7,10 +7,8 @@ import Button from '../../components/Button/index.jsx'
 
 const TurnPassScreen = () => {
   const { state, dispatch } = useGame()
-  const { currentTeamId, teams, round, tiebreakerFormat, players } = state
+  const { currentTeamId, round, tiebreakerFormat, players, currentPlayerIndex } = state
 
-  const team = teams[currentTeamId]
-  const currentPlayerIndex = team.playerIndices[team.queuePos % team.playerIndices.length]
   const playerColor = getColor(currentPlayerIndex)
   const playerName = players[currentPlayerIndex]?.name?.trim() || `Jogador ${currentPlayerIndex + 1}`
 

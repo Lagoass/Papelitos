@@ -16,7 +16,7 @@ export const teamIdsFor = (numTeams) => TEAM_IDS.slice(0, numTeams)
 export const buildTeams = (numTeams) => {
   const result = {}
   for (const id of teamIdsFor(numTeams)) {
-    result[id] = { score: 0, playerIndices: [], queuePos: 0 }
+    result[id] = { score: 0, playerIndices: [] }
   }
   return result
 }

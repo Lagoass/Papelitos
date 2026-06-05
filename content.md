@@ -114,10 +114,12 @@ papelito/
 // Player — criado incrementalmente conforme cada jogador passa pelo dispositivo.
 // Primeiro slot criado em SETUP_COMPLETE. Slots subsequentes criados em NEXT_PLAYER.
 {
-  index:  number,                          // 0-based. "Jogador N" = index + 1
-  teamId: 'A' | 'B' | 'C' | 'D' | null,    // null até o jogador escolher o time em wordInput
-  name:   string,                          // '' por padrão. Preenchido opcionalmente via SET_PLAYER_NAME.
+  index:      number,                      // 0-based. "Jogador N" = index + 1
+  teamId:     'A' | 'B' | 'C' | 'D' | null, // null até o jogador escolher o time em wordInput
+  name:       string,                      // '' por padrão. Preenchido opcionalmente via SET_PLAYER_NAME.
                                            // Fallback para exibição: name.trim() || `Jogador ${index + 1}`
+  turns:      number,                      // turnos jogados como descritor (default 0). Base da rotação justa (seção 8.6)
+  lastPlayed: number,                      // turnSeq do último turno deste jogador (default -1). Desempate da rotação
   // cor não é armazenada — sempre derivada via getColor(index) sob demanda (ver seção 11)
 }
 
@@ -125,7 +127,7 @@ papelito/
 {
   score:         number,   // pontuação acumulada nas 4 rodadas
   playerIndices: number[], // índices dos jogadores deste time (referência a players[])
-  queuePos:      number,   // posição atual na fila circular de jogadores do time
+  // Sem queuePos: a escolha do descritor é por prioridade (least-turns), não por ponteiro de fila (seção 8.6)
 }
 ```
 
@@ -162,8 +164,8 @@ const initialState = {
   // ── TIMES ─────────────────────────────────────────────────────────────────
   numTeams: 2,               // 2 | 3 | 4 — definido no SetupScreen
   teams: {                   // construído dinamicamente via buildTeams(numTeams). Default = 2 times.
-    A: { score: 0, playerIndices: [], queuePos: 0 },
-    B: { score: 0, playerIndices: [], queuePos: 0 },
+    A: { score: 0, playerIndices: [] },
+    B: { score: 0, playerIndices: [] },
   },
 
   // Ordem cíclica de jogada — definida pela RouletteScreen via shuffle de teamIdsFor(numTeams).
@@ -177,6 +179,12 @@ const initialState = {
   // Time que abriu a rodada atual.
   // Usado para calcular qual time abre a próxima rodada via teamOrder.
   roundStartTeam: null,      // 'A' | 'B' | 'C' | 'D'
+
+  // ── ROTAÇÃO DE JOGADORES (least-turns — seção 8.6) ─────────────────────────
+  // Descritor do turno atual: o jogador do currentTeamId que jogou menos vezes.
+  // Escolhido ao entrar em turnPass (ROULETTE_DONE, END_TURN, ADVANCE_ROUND).
+  currentPlayerIndex: null,  // índice em players[] | null antes da roleta
+  turnSeq: 0,                // relógio global de turnos; vira o lastPlayed de cada descritor
 
   // ── POOL E FILA ───────────────────────────────────────────────────────────
   // pool: IMUTÁVEL após START_GAME. Nunca é modificado durante o jogo.
@@ -258,7 +266,7 @@ gameOver
 | `SET_NUM_TEAMS` | `2 \| 3 \| 4` | Atualiza `numTeams` e reconstrói `teams` via `buildTeams(n)`. Disponível apenas no setup. |
 | `ADD_THEME` | `string` | Adiciona ao array `themes`. `wordsPerPlayer` passa a ser `themes.length`. |
 | `REMOVE_THEME` | `string` | Remove do array `themes`. Recalcula `wordsPerPlayer`. |
-| `SETUP_COMPLETE` | — | Cria o primeiro slot em `players[]`: `{ index: 0, teamId: null, name: '' }`. Reconstrói `teams` via `buildTeams(numTeams)` (garante consistência caso o usuário tenha mudado `numTeams` após criar players em um setup anterior). `phase → 'wordInput'`. |
+| `SETUP_COMPLETE` | — | Cria o primeiro slot em `players[]`: `{ index: 0, teamId: null, name: '', turns: 0, lastPlayed: -1 }`. Reconstrói `teams` via `buildTeams(numTeams)` (garante consistência caso o usuário tenha mudado `numTeams` após criar players em um setup anterior). `phase → 'wordInput'`. |
 | `TEST_QUICK_START` | — | **Modo de teste** (ver seção 17). Força `mode: 'normal'`, gera `2 × numTeams` jogadores nomeados "Teste N" distribuídos uniformemente entre os times, popula o `pool` com palavras de `FAKE_WORDS` (com sufixo numérico se sair do pool), `phase → 'roulette'`. Dispatched pela `SetupScreen` no lugar de `SETUP_COMPLETE` quando `TEST_MODE === true`. |
 
 ### Inserção de Palavras
@@ -268,30 +276,30 @@ gameOver
 | `SET_PLAYER_NAME` | `string` | Atualiza `name` do objeto em `players[wordInputCurrentIndex]`. Disparado a cada keystroke no campo de nome da `WordInputScreen`. |
 | `SET_PLAYER_TEAM` | `'A' \| 'B' \| 'C' \| 'D'` | Atualiza `teamId` do objeto em `players[wordInputCurrentIndex]`. O objeto já existe — criado em `SETUP_COMPLETE` ou `NEXT_PLAYER`. IDs válidos limitados aos times ativos (`teamIdsFor(numTeams)`). |
 | `PLAYER_CONFIRMED` | `{ words: [{ text, theme? }] }` | Irreversível. Recebe todas as palavras do jogador em batch. Para cada word, cria `{ id: crypto.randomUUID(), text, theme, playerIndex: wordInputCurrentIndex }` e adiciona ao `pool`. O `teamId` usado é `players[wordInputCurrentIndex].teamId` — atribuído anteriormente via `SET_PLAYER_TEAM`. O botão Confirmar só fica habilitado quando `teamId !== null`, garantindo que nunca seja null aqui. Adiciona o player finalizado ao `teams[teamId].playerIndices`. `phase → 'wordInputPass'`. No Modo Temático, cada word inclui `theme: themes[i]` — montado pela tela antes do dispatch. No Modo Normal, `theme: null`. |
-| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null }`. `phase → 'wordInput'`. |
+| `NEXT_PLAYER` | — | Incrementa `wordInputCurrentIndex` de N para N+1. Cria o próximo slot em `players[]` com o valor **após** o incremento: `{ index: N+1, teamId: null, name: '', turns: 0, lastPlayed: -1 }`. `phase → 'wordInput'`. |
 | `START_GAME` | — | Validação deve passar (ver seção 8.1). Trava o `pool`. `phase → 'roulette'`. |
 
 ### Roulette e Início
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `ROULETTE_DONE` | `{ teamOrder, firstTeam }` | `teamOrder` é a ordem cíclica completa (shuffle de `teamIdsFor(numTeams)`, ou de `tiebreakerTeams` durante desempate). `firstTeam === teamOrder[0]`. Define `currentTeamId` e `roundStartTeam` como `firstTeam`. Sempre reconstrói `queue = shuffle([...pool])`, tanto no Round 1 quanto no desempate. Não altera `queuePos` — usa o valor atual. `phase → 'turnPass'`. |
+| `ROULETTE_DONE` | `{ teamOrder, firstTeam }` | `teamOrder` é a ordem cíclica completa (shuffle de `teamIdsFor(numTeams)`, ou de `tiebreakerTeams` durante desempate). `firstTeam === teamOrder[0]`. Define `currentTeamId` e `roundStartTeam` como `firstTeam`. Escolhe `currentPlayerIndex = pickDescriber(firstTeam)` (jogador do time que jogou menos — seção 8.6). Sempre reconstrói `queue = shuffle([...pool])`, tanto no Round 1 quanto no desempate. `phase → 'turnPass'`. |
 
 ### Turno
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
 | `TURN_CONFIRMED` | — | `currentWord = queue[0]`. `turnSkips = 0`. `phase → 'playing'`. |
-| `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue` filtrando por id: `queue.filter(w => w.id !== currentWord.id)`. Verifica se `queue.length === 0` (ver seção 8.2). Caso contrário: `currentWord = queue[0]`. |
+| `HIT` | — | `teams[currentTeamId].score++`. `turnHits++`. Remove `currentWord` da `queue` filtrando por id: `queue.filter(w => w.id !== currentWord.id)`. Verifica se `queue.length === 0` (ver seção 8.2). **Se zerou** (fim de turno por acerto da última palavra), credita o descritor via `creditTurn` (`currentPlayerIndex.turns++`, `lastPlayed = turnSeq++`) antes de transicionar. Caso contrário: `currentWord = queue[0]` (mesmo descritor continua, sem crédito). |
 | `SKIP` | — | Move `currentWord` para o final de `queue`. `currentWord = queue[0]`. `turnSkips++`. Se `queue.length === 1`, `currentWord` permanece o mesmo objeto — comportamento esperado. O jogador só pode sair dessa situação via `END_TURN`. |
 | `BACK` | — | Só opera se `turnSkips > 0` e `queue.length > 1`. A última palavra pulada está sempre no final da `queue` (SKIP sempre appenda ao fim, sem reembaralhar). Remove-a do final, coloca-a na posição 0 como novo `currentWord`, e move o `currentWord` anterior para a posição 1. `turnSkips--`. |
-| `END_TURN` | — | **Guard:** retorna `state` inalterado se `currentWord === null` ou `phase !== 'playing'` (proteção contra reentrância). Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Avança `queuePos` do time atual. `nextTeamId = teamOrder[(idx + 1) % teamOrder.length]` onde `idx = teamOrder.indexOf(currentTeamId)`. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
+| `END_TURN` | — | **Guard:** retorna `state` inalterado se `currentWord === null` ou `phase !== 'playing'` (proteção contra reentrância). Reinsere `currentWord` no final da `queue`. `queue = shuffle(queue)`. Credita o descritor que jogou via `creditTurn` (`currentPlayerIndex.turns++`, `lastPlayed = turnSeq++`). `nextTeamId = teamOrder[(idx + 1) % teamOrder.length]` onde `idx = teamOrder.indexOf(currentTeamId)`. Escolhe `currentPlayerIndex = pickDescriber(nextTeamId)`. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
 
 ### Rodada
 
 | Action | Payload | Comportamento |
 |--------|---------|---------------|
-| `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = teamOrder[(idx + 1) % teamOrder.length]` onde `idx = teamOrder.indexOf(roundStartTeam)`. `currentTeamId = novo roundStartTeam`. `queue = shuffle([...pool])`. Avança `queuePos` do time que vai começar. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
+| `ADVANCE_ROUND` | — | `round++`. `roundStartTeam = teamOrder[(idx + 1) % teamOrder.length]` onde `idx = teamOrder.indexOf(roundStartTeam)`. `currentTeamId = novo roundStartTeam`. Escolhe `currentPlayerIndex = pickDescriber(novo roundStartTeam)`. **Não credita** — o turno que fechou a rodada já foi creditado no `HIT`. `queue = shuffle([...pool])`. `turnHits = 0`. `turnSkips = 0`. `phase → 'turnPass'`. |
 | `GAME_OVER` | — | `phase → 'gameOver'`. O reducer não toca o localStorage — side effect tratado pelo `GameContext` (ver seção 12). |
 | `RESET_GAME` | — | Retorna `initialState` diretamente. Disparado pelo `ResultsScreen` ao confirmar "Nova Partida". O localStorage já foi limpo pelo `GameContext` quando `phase` virou `'gameOver'`. |
 | `LOAD_GAME` | `GameState` | Retorna o payload diretamente como novo estado. Disparado pelo `App.jsx` ao confirmar retomada de partida salva. |
@@ -382,22 +390,39 @@ Com `numTeams = 2`, a regra equivale ao antigo "oposto da rodada anterior". Com 
 
 **Consequência:** com `numTeams = 4` em 4 rodadas, cada time abre exatamente uma rodada. Com `numTeams = 3` em 4 rodadas, um time abre duas (o que ocupa o primeiro slot da `teamOrder`).
 
-### 8.6 Rotação de Jogadores por Time
+### 8.6 Rotação de Jogadores por Time — seleção por prioridade (least-turns)
 
-Cada time tem uma fila circular independente. O jogador atual de um time é:
+O descritor de um turno é escolhido por **prioridade**, não por um ponteiro de fila. Quando um time vai jogar, o descritor é o membro do time que **jogou menos vezes** até agora:
 
 ```javascript
-const currentPlayer = (team) => {
-  const { playerIndices, queuePos } = team
-  return playerIndices[queuePos % playerIndices.length]
+const pickDescriber = (teamId, teams, players) => {
+  const indices = teams[teamId].playerIndices
+  return indices.reduce((best, idx) => {
+    const p = players[idx], b = players[best]
+    if (p.turns !== b.turns)          return p.turns < b.turns ? idx : best        // menos turnos
+    if (p.lastPlayed !== b.lastPlayed) return p.lastPlayed < b.lastPlayed ? idx : best // jogou há mais tempo
+    return idx < best ? idx : best                                                  // menor índice
+  }, indices[0])
 }
 ```
 
-`queuePos` é incrementado em:
-- `END_TURN` → para o time que acabou de jogar.
-- `ADVANCE_ROUND` → para o time que vai abrir a próxima rodada.
+**A escolha só considera `turns` (oportunidade), nunca palavras acertadas (habilidade).** Isso é deliberado: igualar oportunidade é justo; reagir a desempenho puniria o bom descritor e premiaria o fraco com turnos extras.
 
-`queuePos` **nunca é resetado** — nem na virada de rodada, nem no desempate. `ROULETTE_DONE` não altera `queuePos`. O jogador que abre qualquer rodada (incluindo o desempate) é sempre `playerIndices[queuePos % playerIndices.length]` do time sorteado, garantindo continuidade absoluta da rotação.
+**Contabilização (`creditTurn`).** Ao FIM de cada turno — tanto por timer (`END_TURN`) quanto por acerto da última palavra que fecha a rodada (`HIT` com queue vazia) — o descritor que jogou recebe `turns++` e `lastPlayed = turnSeq`, e `turnSeq` avança. Um `HIT` normal (queue não vazia) **não** encerra o turno: o mesmo descritor continua e não há crédito.
+
+**Quando o descritor é escolhido.** `currentPlayerIndex = pickDescriber(...)` é definido nas transições que entram em `turnPass`:
+- `ROULETTE_DONE` → para o `firstTeam`.
+- `END_TURN` → para o próximo time (`nextTeamId`), usando os contadores já creditados.
+- `ADVANCE_ROUND` → para o time que abre a nova rodada (sem creditar — o fecho já foi creditado no `HIT`).
+
+**Continuidade.** Os contadores `turns`/`lastPlayed` vivem em `players[]` e **nunca resetam** durante a partida (só em `RESET_GAME`). Quem ficou para trás numa rodada é automaticamente priorizado na seguinte — sem ponteiro, bump ou congelamento.
+
+**Garantias** (validadas por simulação dirigindo o reducer real, 2–4 times, 4–11 jogadores, vários ritmos):
+- **Spread interno ≤ 1**: dentro de um time, a diferença entre quem mais e quem menos jogou nunca passa de 1 turno.
+- **Ninguém zerado**: nenhum jogador fica sem ser descritor, exceto no caso aritmético impossível (turnos totais do jogo < nº de jogadores — só ocorre com pool minúsculo + acerto rápido, sem solução por algoritmo).
+- **Neutro à habilidade**: craque e iniciante recebem o mesmo número de turnos.
+
+**Limitação por design (não é bug).** Em times de tamanhos diferentes, membros do time maior são descritores menos vezes *no total*, pois os turnos são alocados por time (a unidade competitiva é o time — seção 16). A rotação só equaliza *dentro* de cada time. No **desempate**, os contadores acumulados do jogo seguem valendo: entre os times empatados, quem jogou menos abre.
 
 ### 8.7 Timer
 
@@ -581,7 +606,7 @@ export const teamIdsFor = (numTeams) => TEAM_IDS.slice(0, numTeams)
 export const buildTeams = (numTeams) => {
   const result = {}
   for (const id of teamIdsFor(numTeams)) {
-    result[id] = { score: 0, playerIndices: [], queuePos: 0 }
+    result[id] = { score: 0, playerIndices: [] }
   }
   return result
 }

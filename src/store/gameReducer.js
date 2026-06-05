@@ -3,6 +3,29 @@ import { shuffle } from '../utils/shuffle.js'
 import { buildTeams, teamIdsFor } from '../utils/teams.js'
 import { FAKE_WORDS } from '../utils/dev.js'
 
+// Rotação justa (least-turns): o próximo descritor de um time é o jogador que
+// jogou MENOS vezes. Empate → quem jogou há mais tempo (menor lastPlayed) →
+// menor índice. Só conta turnos (oportunidade), nunca palavras (habilidade).
+const pickDescriber = (teamId, teams, players) => {
+  const indices = teams[teamId].playerIndices
+  return indices.reduce((best, idx) => {
+    const p = players[idx], b = players[best]
+    if (p.turns !== b.turns) return p.turns < b.turns ? idx : best
+    if (p.lastPlayed !== b.lastPlayed) return p.lastPlayed < b.lastPlayed ? idx : best
+    return idx < best ? idx : best
+  }, indices[0])
+}
+
+// Credita um turno ao descritor que acabou de jogar e avança o relógio global.
+// Retorna { players, turnSeq } novos. Usado no fim de cada turno (timer ou fecho de rodada).
+const creditTurn = (state) => {
+  const i = state.currentPlayerIndex
+  const players = state.players.map((p, idx) =>
+    idx === i ? { ...p, turns: p.turns + 1, lastPlayed: state.turnSeq } : p
+  )
+  return { players, turnSeq: state.turnSeq + 1 }
+}
+
 const gameReducer = (state, action) => {
   switch (action.type) {
 
@@ -39,7 +62,7 @@ const gameReducer = (state, action) => {
     case 'SETUP_COMPLETE':
       return {
         ...state,
-        players: [{ index: 0, teamId: null, name: '' }],
+        players: [{ index: 0, teamId: null, name: '', turns: 0, lastPlayed: -1 }],
         teams: buildTeams(state.numTeams),
         phase: 'wordInput',
       }
@@ -58,7 +81,7 @@ const gameReducer = (state, action) => {
 
       for (let i = 0; i < totalPlayers; i++) {
         const teamId = teamIds[i % numTeams]
-        players.push({ index: i, teamId, name: `Teste ${i + 1}` })
+        players.push({ index: i, teamId, name: `Teste ${i + 1}`, turns: 0, lastPlayed: -1 })
         teams[teamId].playerIndices.push(i)
 
         for (let w = 0; w < wpp; w++) {
@@ -132,7 +155,7 @@ const gameReducer = (state, action) => {
       return {
         ...state,
         wordInputCurrentIndex: nextIndex,
-        players: [...state.players, { index: nextIndex, teamId: null, name: '' }],
+        players: [...state.players, { index: nextIndex, teamId: null, name: '', turns: 0, lastPlayed: -1 }],
         phase: 'wordInput',
       }
     }
@@ -151,13 +174,13 @@ const gameReducer = (state, action) => {
 
     case 'ROULETTE_DONE': {
       // payload: { teamOrder, firstTeam }
-      // queuePos nunca alterado aqui — seção 8.6
       const { teamOrder, firstTeam } = action.payload
       return {
         ...state,
         teamOrder,
         currentTeamId: firstTeam,
         roundStartTeam: firstTeam,
+        currentPlayerIndex: pickDescriber(firstTeam, state.teams, state.players),
         queue: shuffle([...state.pool]),
         phase: 'turnPass',
       }
@@ -188,6 +211,8 @@ const gameReducer = (state, action) => {
       const newTurnHits = turnHits + 1
 
       if (newQueue.length === 0) {
+        // Fim de turno por acerto da última palavra → credita o descritor (seção 8.6)
+        const credit = creditTurn(state)
         if (round === 4) {
           // determina vencedor / empate entre N times
           const ids = teamIdsFor(numTeams)
@@ -198,6 +223,7 @@ const gameReducer = (state, action) => {
           if (tied.length > 1) {
             return {
               ...state,
+              ...credit,
               teams: newTeams,
               queue: newQueue,
               turnHits: newTurnHits,
@@ -209,6 +235,7 @@ const gameReducer = (state, action) => {
           }
           return {
             ...state,
+            ...credit,
             teams: newTeams,
             queue: newQueue,
             turnHits: newTurnHits,
@@ -218,6 +245,7 @@ const gameReducer = (state, action) => {
         }
         return {
           ...state,
+          ...credit,
           teams: newTeams,
           queue: newQueue,
           turnHits: newTurnHits,
@@ -251,7 +279,7 @@ const gameReducer = (state, action) => {
     }
 
     case 'END_TURN': {
-      const { currentTeamId, currentWord, queue, teams, teamOrder } = state
+      const { currentTeamId, currentWord, queue, teamOrder } = state
       // guard: END_TURN só faz sentido durante 'playing' com currentWord válido
       if (!currentWord || state.phase !== 'playing') return state
       const idx = teamOrder.indexOf(currentTeamId)
@@ -261,18 +289,16 @@ const gameReducer = (state, action) => {
       const withoutCurrent = queue.filter(w => w.id !== currentWord.id)
       const newQueue = shuffle([...withoutCurrent, currentWord])
 
+      // credita o descritor que acabou de jogar; escolhe o do próximo time — seção 8.6
+      const credit = creditTurn(state)
+
       return {
         ...state,
+        ...credit,
         queue: newQueue,
         currentWord: null,
-        teams: {
-          ...teams,
-          [currentTeamId]: {
-            ...teams[currentTeamId],
-            queuePos: teams[currentTeamId].queuePos + 1,
-          },
-        },
         currentTeamId: nextTeamId,
+        currentPlayerIndex: pickDescriber(nextTeamId, state.teams, credit.players),
         turnHits: 0,
         turnSkips: 0,
         phase: 'turnPass',
@@ -291,14 +317,8 @@ const gameReducer = (state, action) => {
         round: state.round + 1,
         roundStartTeam: newRoundStartTeam,
         currentTeamId: newRoundStartTeam,
+        currentPlayerIndex: pickDescriber(newRoundStartTeam, state.teams, state.players),
         queue: shuffle([...state.pool]),
-        teams: {
-          ...state.teams,
-          [newRoundStartTeam]: {
-            ...state.teams[newRoundStartTeam],
-            queuePos: state.teams[newRoundStartTeam].queuePos + 1,
-          },
-        },
         turnHits: 0,
         turnSkips: 0,
         phase: 'turnPass',
@@ -311,8 +331,27 @@ const gameReducer = (state, action) => {
     case 'RESET_GAME':
       return initialState
 
-    case 'LOAD_GAME':
-      return action.payload
+    case 'LOAD_GAME': {
+      // Normaliza saves antigos (pré-rotação least-turns): garante os campos novos
+      // para não quebrar a escolha do descritor numa partida retomada.
+      const loaded = action.payload
+      const players = loaded.players.map(p => ({
+        ...p,
+        turns: p.turns ?? 0,
+        lastPlayed: p.lastPlayed ?? -1,
+      }))
+      const next = {
+        ...loaded,
+        players,
+        turnSeq: loaded.turnSeq ?? 0,
+        currentPlayerIndex: loaded.currentPlayerIndex,
+      }
+      // Se o descritor não veio salvo mas o jogo já está em andamento, recomputa.
+      if ((next.currentPlayerIndex === undefined || next.currentPlayerIndex === null) && next.currentTeamId) {
+        next.currentPlayerIndex = pickDescriber(next.currentTeamId, next.teams, players)
+      }
+      return next
+    }
 
     // ── Desempate ─────────────────────────────────────────────────────────
 
