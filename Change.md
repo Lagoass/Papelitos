@@ -273,22 +273,47 @@ criar (host) → lobby (código + QR na tela do host; jogadores entram, escolhem
 
 Cada fase é entregável e deixa o app funcional. Nenhuma fase quebra o Papelito.
 
-> **Meta atual: Fases 1 e 2** — a transformação em hub (LaGames). As Fases 3 e 4 vêm na
-> sequência, quando decidirmos atacar a categoria conectada. A Fase 5 é **meta de longo
-> prazo**, registrada aqui apenas para orientar as decisões de arquitetura.
+> **Meta atual: Fases 0, 1 e 2** — os quick wins de UI e a transformação em hub (LaGames).
+> As Fases 3 e 4 vêm na sequência, quando decidirmos atacar a categoria conectada. A Fase 5
+> é **meta de longo prazo**, registrada aqui apenas para orientar as decisões de arquitetura.
+>
+> O trabalho de UI segue o `UserInterface.md` (validado no protótipo "UI Playground") e está
+> distribuído nas fases abaixo: Fase 0 (quick wins, independentes da migração), Fase 1
+> (UI do hub) e Fase 2 (refinamento visual no rebrand).
+
+### Fase 0 — Quick wins de UI no Papelito atual **[não depende da migração]**
+Aplicação direta do `UserInterface.md` §9.1 no app como está hoje — cada item é pequeno,
+independente e testável numa festa real antes da migração ao hub:
+- Kit CSS app-like (§6.3): `overscroll-behavior`, `user-select: none`, `touch-callout`,
+  `tap-highlight`, `touch-manipulation` nos botões.
+- Timer com anel SVG e 3 faixas de urgência (neutro → âmbar → vermelho + pulso + vibração)
+  e shake no zero.
+- Botões com o vocabulário novo: Pop (squash & stretch com easeOutBack) no CTA de turno;
+  avaliar Afundar (neubrutalismo) nos primários.
+- Placar-show: reveal escalonado + count-up entre rodadas; pódio em etapas + confete na
+  tela de resultados.
+- Microcopy com variação aleatória + reação à inação na TurnPassScreen.
+- **Critério de aceite:** jogar uma partida real e sentir a diferença; zero mudança de regra.
+- Risco: baixo — só camada de apresentação; o reducer não é tocado.
 
 ### Fase 1 — Hub + módulo Papelito (sem rede, sem rebrand)
 - Criar `src/shell/` e `src/games/papelito/`; mover arquivos conforme seção 3.
-- Criar `HomeScreen` (categorias + card do Papelito) e roteamento shell ↔ jogo.
+- Criar `HomeScreen` seguindo o `UserInterface.md` §6.1: layout bento com card-herói do
+  Papelito (arte sem texto: gradiente + emoji-personagem), categorias como seções
+  empilhadas, card "Continuar partida" quando houver save, entrada com stagger.
+- UI de base do hub (`UserInterface.md` §3): fundo charcoal `#0E0E0E`, grain overlay,
+  blobs de fundo, `--game-accent` por jogo, Fredoka self-hosted nos displays.
 - Mover Settings/Splash/temas/InstallBanner para o shell.
 - Reorganizar documentação conforme 3.1: fatiar `content.md` em `docs/architecture/hub.md` +
   `docs/architecture/pass-phone.md` + `docs/specs/papelito.md`; `rules.md` →
-  `docs/rulebook/papelito.md`.
+  `docs/rulebook/papelito.md`; `UserInterface.md` → `docs/architecture/`.
 - **Critério de aceite:** Papelito joga exatamente como hoje; única diferença visível é a home.
-- Risco: baixo (só movimentação). É a fase que valida a estrutura multi-jogos.
+- Risco: baixo (só movimentação + camada visual). É a fase que valida a estrutura multi-jogos.
 
 ### Fase 2 — Rebrand LaGames
 - Nome, ícones, manifest, splash, chaves de storage do shell (com migração).
+- Identidade visual final (`UserInterface.md`): fonte do logo (Luckiest Guy/Bungee — decidir),
+  refinar os 6 temas na hierarquia de 4 camadas (§3.1), ícones PWA do LaGames.
 - Comunicar necessidade de reinstalação do PWA.
 - **Critério de aceite:** app instala como "LaGames"; Papelito intacto dentro dele.
 
