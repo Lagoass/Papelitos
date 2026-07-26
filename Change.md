@@ -99,6 +99,7 @@ lagames/                            ← repo (único — ver seção 7)
 ├── index.html
 ├── vite.config.js
 ├── Change.md                       ← este documento (escopo: o hub / migração)
+├── UserInterface.md                ← base de UI do hub + nuances por jogo (na fase 1 move p/ docs/architecture/)
 └── progress.md
 ```
 
