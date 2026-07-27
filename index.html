@@ -3,19 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0E0E0E" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Papelito" />
-    <title>Papelito</title>
+    <meta name="apple-mobile-web-app-title" content="LaGames" />
+    <title>LaGames</title>
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <script>
       // Aplica tema salvo o mais cedo possível — antes do bundle carregar.
       // Sem isso, o Android pode "travar" a cor da safe-area no theme-color
-      // padrão (#000000) na primeira renderização, criando uma linha visível
-      // entre safe-area preta e body colorido em temas não-preto.
+      // padrão na primeira renderização, criando uma linha visível entre
+      // safe-area e body em temas não-escuros.
+      // Lê a chave nova (lagames_theme) com fallback na antiga (papelito_theme)
+      // — a migração definitiva acontece no themes.js do bundle.
       (function () {
         try {
           var THEMES = {
@@ -26,7 +28,8 @@
             junina:    '#1c0a0a',
             light:     '#fef9f0',
           }
-          var id = localStorage.getItem('papelito_theme') || 'mono'
+          var id = localStorage.getItem('lagames_theme') ||
+                   localStorage.getItem('papelito_theme') || 'mono'
           var bg = THEMES[id] || THEMES.mono
           var meta = document.querySelector('meta[name="theme-color"]')
           if (meta) meta.setAttribute('content', bg)

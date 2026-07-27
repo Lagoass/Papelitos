@@ -125,11 +125,11 @@ fade-out 300ms. Cobre a transição rígida do splash nativo do Android.
 |-------|------|----------|
 | `papelito_game_state` | jogo Papelito | save da partida em andamento (limpo em gameOver) |
 | `papelito_test_mode` | jogo Papelito | flag do modo de teste (combo secreto) |
-| `papelito_theme` | shell | id do tema ativo |
-| `papelito_install_dismissed` | shell | dispensa do banner de instalação |
+| `lagames_theme` | shell | id do tema ativo (migra de `papelito_theme` com fallback de leitura) |
+| `lagames_install_dismissed` | shell | dispensa do banner de instalação (fallback da chave antiga) |
 
-Todas independentes. Prefixo por dono; jogos novos usam `<gameId>_*`.
-(Rebrand — Change.md fase 2 — migra as chaves do shell para `lagames_*` com fallback.)
+Todas independentes. Prefixo por dono: chaves do shell usam `lagames_*`; chaves de jogo
+usam `<gameId>_*`. O script inline do `index.html` também lê `lagames_theme` com fallback.
 
 ## 8. Deploy — Cloudflare Pages
 

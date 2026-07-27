@@ -71,7 +71,9 @@ const HomeScreen = ({ onPlay }) => {
       <div className="relative flex flex-col gap-6">
         {/* Header */}
         <div className="anim-fade-up flex items-center justify-between pt-2" style={{ animationDelay: '0ms' }}>
-          <h1 className="font-display text-3xl font-bold tracking-tight">Papelito</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            <span className="text-amber-400">La</span>Games
+          </h1>
           <button
             onClick={() => setShowSettings(true)}
             className="text-2xl leading-none active:scale-90 transition-transform"

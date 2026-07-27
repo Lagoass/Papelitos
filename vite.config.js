@@ -15,11 +15,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name:             'Papelito',
-        short_name:       'Papelito',
-        description:      'O jogo de palavras em 4 rodadas',
-        theme_color:      '#000000',
-        background_color: '#000000',
+        name:             'LaGames',
+        short_name:       'LaGames',
+        description:      'Jogos de festa para jogar com os amigos',
+        theme_color:      '#0E0E0E',
+        background_color: '#0E0E0E',
         display:          'fullscreen',
         display_override: ['fullscreen', 'standalone', 'minimal-ui'],
         orientation:      'portrait',

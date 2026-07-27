@@ -6,7 +6,9 @@ import { useEffect, useState, useCallback } from 'react'
 // - Detecta iOS (Safari não dispara beforeinstallprompt) → expõe flag para mostrar instruções manuais.
 // - Persiste dismissal em localStorage para não atormentar o usuário.
 
-const DISMISS_KEY = 'papelito_install_dismissed'
+// Rebrand LaGames: chave nova com fallback de leitura da antiga.
+const DISMISS_KEY = 'lagames_install_dismissed'
+const LEGACY_DISMISS_KEY = 'papelito_install_dismissed'
 
 const isStandalone = () => {
   if (typeof window === 'undefined') return false
@@ -24,7 +26,10 @@ const isIOS = () => {
 }
 
 const wasDismissed = () => {
-  try { return localStorage.getItem(DISMISS_KEY) === '1' } catch { return false }
+  try {
+    return localStorage.getItem(DISMISS_KEY) === '1' ||
+      localStorage.getItem(LEGACY_DISMISS_KEY) === '1'
+  } catch { return false }
 }
 
 export const useInstallPrompt = () => {

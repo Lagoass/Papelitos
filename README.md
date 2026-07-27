@@ -1,8 +1,12 @@
-# Papelito
+# LaGames
 
 **[papelitos.pages.dev](https://papelitos.pages.dev)**
 
-Um PWA de jogo de festa onde dois times competem em 4 rodadas com regras de comunicação progressivamente mais restritivas.
+Hub de jogos de festa em PWA, feito para jogar com amigos. Dois tipos de jogo: **Passa o Celular** (um aparelho compartilhado, 100% offline) e, futuramente, **Todos Conectados** (cada um no seu telefone).
+
+## Papelito — o primeiro jogo
+
+Jogo de festa onde 2 a 4 times competem em 4 rodadas com regras de comunicação progressivamente mais restritivas.
 
 ## Como Funciona
 

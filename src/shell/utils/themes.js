@@ -1,7 +1,10 @@
 // Sistema de temas — aplicado via classe no <body>.
 // CSS para cada tema vive em index.css. Mono = default (nenhuma classe).
 
-const THEME_KEY = 'papelito_theme'
+// Rebrand LaGames: chave nova com migração transparente da antiga —
+// quem escolheu tema antes do rebrand não perde a escolha.
+const THEME_KEY = 'lagames_theme'
+const LEGACY_THEME_KEY = 'papelito_theme'
 
 export const THEMES = [
   { id: 'mono',      label: 'Mono',      bg: '#0E0E0E' },
@@ -16,7 +19,7 @@ export const DEFAULT_THEME = 'mono'
 
 export const getTheme = () => {
   try {
-    const stored = localStorage.getItem(THEME_KEY)
+    const stored = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY)
     return THEMES.find(t => t.id === stored) ? stored : DEFAULT_THEME
   } catch {
     return DEFAULT_THEME
@@ -26,6 +29,7 @@ export const getTheme = () => {
 export const applyTheme = (id) => {
   try {
     localStorage.setItem(THEME_KEY, id)
+    localStorage.removeItem(LEGACY_THEME_KEY) // migração concluída
   } catch {}
   if (typeof document !== 'undefined') {
     // Aplica em html E body — html cobre a safe-area do recorte da câmera,

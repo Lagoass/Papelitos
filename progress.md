@@ -213,6 +213,28 @@ Build limpo com chunk lazy separado. E2E no browser: home bento renderiza; entra
 
 ---
 
+## Fase 8 — Rebrand LaGames (Change.md Fase 2)
+
+**Status:** `[x] Concluída`
+**Data de conclusão:** 2026-05-27
+
+### O que foi implementado
+- [x] Manifest PWA: name/short_name "LaGames", descrição nova, theme/background `#0E0E0E`.
+- [x] `index.html`: title, apple-mobile-web-app-title e theme-color LaGames; script inline lê `lagames_theme` com fallback na chave antiga.
+- [x] Migração transparente de chaves do shell: `papelito_theme` → `lagames_theme` (leitura com fallback + remoção da antiga no primeiro applyTheme) e `papelito_install_dismissed` → `lagames_install_dismissed` (fallback de leitura). Chaves do JOGO (`papelito_game_state`, `papelito_test_mode`) permanecem — são do módulo.
+- [x] HomeScreen com a marca "LaGames" (La em âmbar, Fredoka); package.json e README atualizados.
+- [x] hub.md com a tabela de chaves atualizada.
+
+### Pendências sinalizadas (dependem do usuário)
+- **Ícones**: `icons/icon-192.png`/`icon-512.png` continuam com a arte do Papelito — trocar quando houver arte LaGames (o splash usa o mesmo arquivo). Manifest já aponta para os caminhos certos.
+- **Reinstalação do PWA**: manifest só é lido na instalação — usuários com o app instalado precisam desinstalar e reinstalar para ver nome "LaGames".
+- Nome do repositório permanece `Papelitos` (decisão registrada no Change.md §7).
+
+### Verificação
+Manifest gerado no dist conferido (LaGames/fullscreen/#0E0E0E). Migração testada no browser: usuário simulado pré-rebrand (tema casino + banner dispensado) → tema aplicado no boot, meta theme-color sincronizada, chave nova gravada e antiga removida. Jogo intacto pós-rebrand (entrada + test mode + roleta). Build limpo.
+
+---
+
 ## Notas Gerais
 
 ### Padrões adotados ao longo do projeto
