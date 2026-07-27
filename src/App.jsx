@@ -1,95 +1,32 @@
-import { useState, useEffect } from 'react'
-import { useGame } from './store/GameContext.jsx'
-import { STORAGE_KEY, deserialize } from './utils/storage.js'
-import SetupScreen from './screens/SetupScreen/index.jsx'
-import WordInputScreen from './screens/WordInputScreen/index.jsx'
-import WordInputPassScreen from './screens/WordInputPassScreen/index.jsx'
-import RouletteScreen from './screens/RouletteScreen/index.jsx'
-import TurnPassScreen from './screens/TurnPassScreen/index.jsx'
-import TurnScreen from './screens/TurnScreen/index.jsx'
-import RoundTransitionScreen from './screens/RoundTransitionScreen/index.jsx'
-import TiebreakerScreen from './screens/TiebreakerScreen/index.jsx'
-import FormatRouletteScreen from './screens/FormatRouletteScreen/index.jsx'
-import ResultsScreen from './screens/ResultsScreen/index.jsx'
-import SplashScreen from './screens/SplashScreen/index.jsx'
-import Button from './components/Button/index.jsx'
+import { useState, lazy, Suspense } from 'react'
+import HomeScreen from '@shell/screens/HomeScreen/index.jsx'
+import SplashScreen from '@shell/screens/SplashScreen/index.jsx'
+import { hasAnyOngoingGame } from '@shell/games.js'
 
-const ResumeModal = ({ savedPhase, onResume, onNew }) => (
-  <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-6 z-50">
-    <p className="text-xl font-semibold text-center mb-2">Partida em andamento</p>
-    <p className="text-zinc-400 text-sm text-center mb-10">
-      Existe uma partida salva (fase: {savedPhase}). Deseja retomá-la?
-    </p>
-    <div className="w-full space-y-4">
-      <Button onClick={onResume}>Retomar partida</Button>
-      <Button variant="secondary" onClick={onNew}>Nova partida</Button>
-    </div>
-  </div>
-)
-
-const PHASE_SCREENS = {
-  setup:           SetupScreen,
-  wordInput:       WordInputScreen,
-  wordInputPass:   WordInputPassScreen,
-  roulette:        RouletteScreen,
-  turnPass:        TurnPassScreen,
-  playing:         TurnScreen,
-  roundTransition: RoundTransitionScreen,
-  tiebreaker:      TiebreakerScreen,
-  formatRoulette:  FormatRouletteScreen,
-  gameOver:        ResultsScreen,
-}
-
-// Detecta sincronicamente se há partida em andamento no localStorage.
-// Usado para decidir se o SplashScreen deve aparecer (só mostra quando
-// o app está abrindo "do zero" — sem partida pra retomar).
-const hasOngoingGame = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return false
-    const saved = deserialize(raw)
-    return !!saved && saved.phase !== 'setup' && saved.phase !== 'gameOver'
-  } catch {
-    return false
-  }
+// Módulos de jogo carregados sob demanda — o bundle inicial é só o hub.
+const GAME_COMPONENTS = {
+  papelito: lazy(() => import('./games/papelito/index.jsx')),
 }
 
 const App = () => {
-  const { state, dispatch, load, clear } = useGame()
-  const [savedState, setSavedState] = useState(null)
-  // Splash só aparece em abertura "limpa" — partida em andamento pula direto
-  // pro ResumeModal pra não atrasar o retorno do usuário ao jogo.
-  const [splashing, setSplashing] = useState(() => !hasOngoingGame())
+  // Splash só em abertura "limpa" — com partida em andamento o usuário
+  // quer voltar rápido (o card "Continuar" está a 1 toque na home).
+  const [splashing, setSplashing] = useState(() => !hasAnyOngoingGame())
+  const [active, setActive] = useState(null) // { id, resume } | null
 
-  // Load único na montagem — seção 12
-  useEffect(() => {
-    const saved = load()
-    if (saved && saved.phase !== 'setup' && saved.phase !== 'gameOver') {
-      setSavedState(saved)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const handlePlay = (id, { resume = false } = {}) => setActive({ id, resume })
+  const handleExit = () => setActive(null)
 
-  const handleResume = () => {
-    dispatch({ type: 'LOAD_GAME', payload: savedState })
-    setSavedState(null)
-  }
-
-  const handleNewGame = () => {
-    clear()
-    setSavedState(null)
-  }
-
-  const Screen = PHASE_SCREENS[state.phase] ?? SetupScreen
+  const ActiveGame = active ? GAME_COMPONENTS[active.id] : null
 
   return (
     <>
-      <Screen />
-      {savedState && (
-        <ResumeModal
-          savedPhase={savedState.phase}
-          onResume={handleResume}
-          onNew={handleNewGame}
-        />
+      {ActiveGame ? (
+        <Suspense fallback={<div className="min-h-screen bg-black" />}>
+          <ActiveGame onExit={handleExit} autoResume={active.resume} />
+        </Suspense>
+      ) : (
+        <HomeScreen onPlay={handlePlay} />
       )}
       {splashing && <SplashScreen onDone={() => setSplashing(false)} />}
     </>

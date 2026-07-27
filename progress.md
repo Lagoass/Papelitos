@@ -192,6 +192,27 @@ Partida completa dirigida no browser (test mode): idle reaction com frases varia
 
 ---
 
+## Fase 7 — Hub + módulo Papelito (Change.md Fase 1)
+
+**Status:** `[x] Concluída`
+**Data de conclusão:** 2026-05-27
+
+### O que foi implementado
+- [x] Reorganização via `git mv` (histórico preservado): `src/shell/` (Button, InstallBanner, Settings, Splash, useInstallPrompt, themes, confetti) e `src/games/papelito/` (todo o jogo, estrutura interna intacta). `CountdownLock` removido (código morto).
+- [x] Aliases Vite `@shell`/`@games`; módulos importam do shell só via `@shell/...`.
+- [x] `shell/games.js` — registry: identidade visual, categoria, saveKey e rules por jogo. Única costura shell↔jogo permitida.
+- [x] `games/papelito/index.jsx` — entry do módulo: `PapelitoGame({ onExit, autoResume })` com GameProvider interno; resume modal OU retomada direta (autoResume).
+- [x] `App.jsx` do shell: home ↔ jogo com `React.lazy` (chunk do Papelito separado, ~36KB); splash pulado com partida em andamento.
+- [x] `HomeScreen` bento (UserInterface.md §6.1): card "Continuar partida" (1 toque), card-herói com gradiente+emoji, ghost "Em breve", categorias empilhadas, stagger, blobs, ⚙️ e InstallBanner (movidos do SetupScreen, que ganhou ← voltar).
+- [x] Base visual do hub: charcoal #0E0E0E no tema mono (css + themes.js + script inline), grain overlay global (feTurbulence), Fredoka Variable self-hosted (~30KB) em `font-display` (títulos, timer, placar).
+- [x] SettingsScreen do shell: regras por jogo via registry.
+- [x] Docs em 3 camadas: `docs/architecture/hub.md` + `pass-phone.md` (contrato da categoria) + `docs/specs/papelito.md` (content.md fatiado) + `docs/rulebook/papelito.md` (rules.md modernizado: 2–4 times, rotação least-turns) + `UserInterface.md` movido para `docs/architecture/`. `content.md` e `rules.md` da raiz removidos.
+
+### Verificação
+Build limpo com chunk lazy separado. E2E no browser: home bento renderiza; entrar/sair do jogo; partida test-mode completa; **save mid-game → reload → card "Continuar · Rodada 1" na home → retomada em 1 toque sem modal com estado intacto (4 acertos, timer)**; splash pulado com save; Settings cicla temas e mostra regras do registry; Fredoka aplicada (computed style). Sem imports cruzados fora do registry; console sem erros novos.
+
+---
+
 ## Notas Gerais
 
 ### Padrões adotados ao longo do projeto

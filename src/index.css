@@ -10,8 +10,53 @@ html, body, #root {
   padding: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: #000000;
+  /* Charcoal, não preto puro — UserInterface.md §3.1: profundidade */
+  background-color: #0E0E0E;
 }
+
+/* Tema mono (default): superfícies "black" viram charcoal */
+html.theme-mono, body.theme-mono { background-color: #0E0E0E; }
+body.theme-mono .bg-black { background-color: #0E0E0E !important; }
+body.theme-mono .bg-black\/95 { background-color: rgba(14, 14, 14, 0.95) !important; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   GRAIN OVERLAY — UserInterface.md §3.3: textura sutil global que tira o ar
+   estéril do dark flat. SVG feTurbulence inline; custo ~zero; todos os temas.
+   ────────────────────────────────────────────────────────────────────────── */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Blobs de fundo (HomeScreen) — a tela "respira" ── */
+.blob-bg {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.12;
+  pointer-events: none;
+  animation: blob-drift 22s ease-in-out infinite alternate;
+}
+.blob-bg-alt { animation-duration: 27s; animation-direction: alternate-reverse; }
+@keyframes blob-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(50px, 35px) scale(1.15); }
+}
+
+/* ── Glow pulsante (card "Continuar partida") ── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 20px 0 var(--glow-color, rgba(245, 158, 11, 0.25)); }
+}
+.anim-glow-pulse { animation: glow-pulse 2.4s ease-in-out infinite; }
 
 /* ──────────────────────────────────────────────────────────────────────────
    KIT CSS APP-LIKE — UserInterface.md §6.3
@@ -85,7 +130,9 @@ button {
   .anim-timer-urgency,
   .anim-score-bump,
   .anim-wiggle,
-  .anim-podium-rise {
+  .anim-podium-rise,
+  .anim-glow-pulse,
+  .blob-bg {
     animation: none;
   }
   /* elementos que entram animados ficam visíveis direto */

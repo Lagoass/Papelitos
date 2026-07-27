@@ -1,8 +1,15 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@shell': fileURLToPath(new URL('./src/shell', import.meta.url)),
+      '@games': fileURLToPath(new URL('./src/games', import.meta.url)),
+    },
+  },
   plugins: [
     react(),
     VitePWA({
