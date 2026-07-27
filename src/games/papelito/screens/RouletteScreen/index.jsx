@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useGame } from '../../store/GameContext.jsx'
 import { TEAM_SYMBOLS, teamIdsFor } from '../../utils/teams.js'
 import { shuffle } from '../../utils/shuffle.js'
+import { haptics } from '@shell/utils/haptics.js'
 
 // Delays em ms — começa rápido e vai desacelerando (efeito slot machine)
 const SPIN_DELAYS = [70, 70, 80, 80, 90, 100, 120, 150, 180, 220, 270, 330, 400, 480, 560]
@@ -36,6 +37,7 @@ const RouletteScreen = () => {
       } else {
         setCurrent(firstTeam)
         setDone(true)
+        haptics.land()
         timeout = setTimeout(() => {
           dispatch({ type: 'ROULETTE_DONE', payload: { teamOrder, firstTeam } })
         }, 2200)
@@ -52,7 +54,7 @@ const RouletteScreen = () => {
 
       <div
         className={`w-44 h-44 rounded-full flex items-center justify-center border-4 transition-colors duration-200 ${
-          done ? 'border-white' : 'border-zinc-700'
+          done ? 'border-white anim-score-bump' : 'border-zinc-700'
         }`}
       >
         <span className="text-8xl">{TEAM_SYMBOLS[current]}</span>
@@ -61,12 +63,21 @@ const RouletteScreen = () => {
       <div className="min-h-[5rem] text-center">
         {done && (
           <>
-            <p className="text-2xl font-bold animate-pulse mb-3">
+            <p className="font-display text-3xl font-bold mb-3 anim-fade-up">
               {TEAM_SYMBOLS[firstTeam]} começa!
             </p>
             {teamOrder.length > 1 && (
-              <p className="text-zinc-500 text-sm">
-                Ordem: {teamOrder.map(id => TEAM_SYMBOLS[id]).join('  →  ')}
+              <p className="text-zinc-400 text-lg tracking-wide">
+                {teamOrder.map((id, i) => (
+                  <span
+                    key={id}
+                    className="anim-fade-up inline-block"
+                    style={{ animationDelay: `${300 + i * 220}ms` }}
+                  >
+                    {i > 0 && <span className="text-zinc-600 mx-2">→</span>}
+                    {TEAM_SYMBOLS[id]}
+                  </span>
+                ))}
               </p>
             )}
           </>

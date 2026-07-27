@@ -235,6 +235,26 @@ Manifest gerado no dist conferido (LaGames/fullscreen/#0E0E0E). Migração testa
 
 ---
 
+## Fase 9 — Redesign interno do Papelito + haptics recalibrados
+
+**Status:** `[x] Concluída`
+**Data de conclusão:** 2026-05-27
+
+### Motivação (feedback do usuário)
+A Fase 0 foi conservadora demais: a entrada (hub) ganhou vida, mas dentro do jogo a UI continuava de formulário e a vibração era imperceptível (10–30ms não acorda o motor da maioria dos Samsungs; vibrar em todo botão é ruído).
+
+### O que foi implementado
+- [x] `shell/utils/haptics.js` — presets calibrados (45–220ms) usados SÓ em momentos-chave: hit, faixa vermelha do timer, tempo esgotado, pouso da roleta, etapas do pódio, vitória, inação. Button não vibra mais por toque.
+- [x] `TurnPassScreen` = **PALCO**: fundo fullscreen em gradiente da cor do jogador (`shade()` novo em colors.js), nome em display gigante (clamp 3–4.5rem), chip compacto de rodada, **provocação competitiva** (TAUNT_AHEAD/BEHIND/TIED em copy.js — diferença de pontos vira frase de rivalidade; nada no 0×0), pills de placar (time da vez em branco), um botão "Sou eu, bora! 🎬".
+- [x] `TurnScreen` = **ARENA** (zero cromo): WordCard flex-1 com texto display clamp até 4rem; contador de acertos pipoca a cada hit (`key={turnHits}` + score-bump); burst de confete + haptic no Acertou; botão-herói verde (variant `success` novo no Button); regra reduzida a lembrete de 1 linha (a completa vive no palco); tinta radial sutil da cor do descritor no fundo.
+- [x] `RouletteScreen`: pouso com pop + haptic; ordem dos times revelada com stagger.
+- [x] `ResultsScreen`: vibrações migradas para os presets.
+
+### Verificação
+Partida dirigida no browser: palco tingido (rgb correto da cor do jogador), sem provocação no 0×0 e com "20 atrás. Hora de virar! 🔥" na rodada 2; arena com palavra 64px, herói verde, burst no hit, contador pipocando; regra completa ausente da arena. Build limpo; console sem erros novos.
+
+---
+
 ## Notas Gerais
 
 ### Padrões adotados ao longo do projeto

@@ -3,6 +3,7 @@ import { useGame } from '../../store/GameContext.jsx'
 import { TEAM_SYMBOLS, teamIdsFor } from '../../utils/teams.js'
 import Button from '@shell/components/Button/index.jsx'
 import { confettiRain } from '@shell/utils/confetti.js'
+import { haptics } from '@shell/utils/haptics.js'
 import { pick, CELEBRATIONS } from '../../data/copy.js'
 
 // Pódio revelado em etapas (3º → 2º → 1º) + confete no campeão —
@@ -59,10 +60,10 @@ const ResultsScreen = () => {
     podium.forEach((_, i) => {
       timers.push(setTimeout(() => {
         setRevealStep(i + 1)
-        try { navigator.vibrate?.(20) } catch { /* sem suporte */ }
+        haptics.step()
         if (i === podium.length - 1) {
           confettiRain()
-          try { navigator.vibrate?.([60, 40, 60, 40, 120]) } catch { /* sem suporte */ }
+          haptics.win()
           setShowRest(true)
         }
       }, (i + 1) * stepMs))

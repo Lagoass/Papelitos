@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { haptics } from '@shell/utils/haptics.js'
 
 const R = 54
 const CIRCUMFERENCE = 2 * Math.PI * R
@@ -15,12 +16,10 @@ const Timer = ({ timeLeft, duration }) => {
   const danger = timeLeft <= dangerAt(duration)
   const warn = !danger && timeLeft <= warnAt(duration)
 
-  // Vibração como bônus (Android; no-op silencioso em iOS) — §3.5
+  // Vibração como sinal de urgência (Android; no-op em iOS) — §3.5
   useEffect(() => {
-    try {
-      if (timeLeft === 0) navigator.vibrate?.([80, 60, 80])
-      else if (danger) navigator.vibrate?.(30)
-    } catch { /* sem suporte — feedback visual basta */ }
+    if (timeLeft === 0) haptics.timeUp()
+    else if (danger) haptics.warn()
   }, [timeLeft, danger])
 
   // Neutro herda do tema (text-white é sobrescrito pelos temas claros);

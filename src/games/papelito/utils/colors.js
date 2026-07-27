@@ -18,4 +18,13 @@ const PLAYER_COLORS = [
 export const getColor = (playerIndex) =>
   PLAYER_COLORS[playerIndex % PLAYER_COLORS.length]
 
+// Escurece/clareia uma cor hex por um fator (0..1 escurece; >1 clareia).
+// Usado para tingir telas inteiras com a cor do jogador mantendo contraste
+// com texto branco (palco da TurnPass, fundo da arena).
+export const shade = (hex, factor) => {
+  const n = parseInt(hex.slice(1), 16)
+  const ch = (s) => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * factor)))
+  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`
+}
+
 export default PLAYER_COLORS

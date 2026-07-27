@@ -33,6 +33,24 @@ export const ROUND_DONE = [
   'Acabaram os papelitos!',
 ]
 
+// Provocação competitiva — TurnPassScreen (rivalidade é o motor da festa).
+// Recebe a diferença de pontos do time da vez para o líder.
+export const TAUNT_BEHIND = (diff) => pick([
+  `${diff} atrás. Hora de virar! 🔥`,
+  `Faltam ${diff} pra alcançar. Bora!`,
+  `Tão perdendo por ${diff}… por enquanto. 😏`,
+])
+export const TAUNT_AHEAD = (diff) => pick([
+  `Na frente por ${diff}. Segura! 🛡️`,
+  `+${diff} de vantagem. Não vacila.`,
+  `Liderando por ${diff}. Mantém! 👑`,
+])
+export const TAUNT_TIED = () => pick([
+  'Tudo empatado. Agora vale. 😬',
+  'Empate técnico — decide no grito.',
+  'Zero folga. Cada palavra conta.',
+])
+
 // Reação à inação — TurnPassScreen (princípio Jackbox: reagir a quem some)
 export const IDLE_CALL = (name) => pick([
   `Cadê você, ${name}?`,
