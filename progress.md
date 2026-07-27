@@ -171,6 +171,27 @@ Teste de integração dirigindo o reducer real em 9 configurações (2–4 times
 
 ---
 
+## Fase 6 — UI Quick Wins (Change.md Fase 0)
+
+**Status:** `[x] Concluída`
+**Data de conclusão:** 2026-05-27
+
+### O que foi implementado (UserInterface.md aplicado; reducer intocado)
+- [x] Kit CSS app-like em `index.css` (§6.3): overscroll, user-select none (inputs re-habilitados), touch-callout, tap-highlight, touch-action manipulation.
+- [x] Vocabulário de animação em CSS: fade-up, timer-urgency, score-bump, wiggle, podium-rise — todos com `prefers-reduced-motion` desativando movimento sem remover feedback.
+- [x] `Timer`: faixas de urgência neutro → âmbar (≤min(20s, 50%)) → vermelho (≤min(10s, 25%)) com pulso; neutro herda do tema via currentColor; vibração 30ms/s na faixa vermelha e padrão [80,60,80] no zero.
+- [x] `Button`: squash & stretch com easeOutBack no release + vibração 10ms no toque + touch-manipulation.
+- [x] `ScoreReveal` (novo): placar-show com reveal escalonado (último → primeiro) + count-up rAF com **fallback por setTimeout** que crava o valor final se o rAF for suprimido (tela travada/aba em background).
+- [x] `RoundTransitionScreen`: usa ScoreReveal + frase variada de fim de rodada.
+- [x] `ResultsScreen`: pódio revelado em etapas (3º → 2º → 1º) + confete + frase de celebração aleatória; empate mantém UI sóbria sem confete.
+- [x] `utils/confetti.js` (novo): canvas próprio, zero deps, ≤100 partículas, cores da paleta de jogadores, no-op sob reduced motion.
+- [x] `data/copy.js` (novo): microcopy centralizada com `pick()` anti-repetição; reação à inação na `TurnPassScreen` (10s → "Cadê você, {nome}?" + wiggle + vibração).
+
+### Verificação
+Partida completa dirigida no browser (test mode): idle reaction com frases variadas, faixas do timer (21s branco → âmbar → vermelho com anim), END_TURN único no zero com rotação correta do descritor, placar-show com valores corretos (15/5), 4 rodadas até gameOver com storage limpo, pódio + frase + canvas de confete no resultado. Build de produção limpo, console sem erros.
+
+---
+
 ## Notas Gerais
 
 ### Padrões adotados ao longo do projeto
