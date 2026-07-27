@@ -21,12 +21,26 @@ export const GAMES = [
     saveKey: 'papelito_game_state',
     rules: PAPELITO_RULES,
   },
+  {
+    // Bancada de teste da categoria conectada (Change.md fase 3) —
+    // descartável por design; valida salas/latência/reconexão do DO.
+    id: 'mural',
+    name: 'Mural',
+    emoji: '📌',
+    category: 'connected',
+    accent: '#06b6d4',
+    gradient: 'linear-gradient(135deg, #155e75, #0891b2 55%, #22d3ee)',
+    meta: '🧪 Bancada de teste · tempo real',
+    saveKey: null,
+    rules: null,
+  },
 ]
 
 // Lê o save de um jogo direto do localStorage (acoplamento documentado:
 // o shell conhece só { phase, round } para montar o card "Continuar").
 export const getSavedGame = (game) => {
   try {
+    if (!game.saveKey) return null
     const raw = localStorage.getItem(game.saveKey)
     if (!raw) return null
     const saved = JSON.parse(raw)

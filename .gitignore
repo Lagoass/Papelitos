@@ -32,3 +32,5 @@ Thumbs.db
 
 # Claude
 chat_rollback.txt
+# Wrangler (Durable Objects local state)
+.wrangler/

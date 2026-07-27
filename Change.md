@@ -317,13 +317,24 @@ independente e testável numa festa real antes da migração ao hub:
 - Comunicar necessidade de reinstalação do PWA.
 - **Critério de aceite:** app instala como "LaGames"; Papelito intacto dentro dele.
 
-### Fase 3 — Infra conectada: lobby "hello world" **[após estudo da seção 4]**
-- `server/` com Worker + 1 Durable Object de sala genérica.
-- Criar sala, código + QR, entrar, presença ao vivo, reconexão com token. **Sem jogo ainda.**
-- **Critério de aceite:** 3+ celulares reais na mesma sala vendo presença um do outro,
-  sobrevivendo a tela apagada/4G oscilando.
-- Este é o degrau que exercita 80% da dificuldade (salas, WebSocket, reconexão) com 0% de
-  regra de jogo.
+### Fase 3 — Infra conectada: Mural de Papelitos **[em andamento]**
+- Em vez de lobby "hello world": **Mural de Papelitos** — bancada de teste descartável com
+  post-its atômicos (sem texto colaborativo/CRDT, de propósito). Testa mutação de estado
+  real, latência mensurável (RTT por ACK), persistência e reconexão — e prototipa a futura
+  inserção de palavras pelo próprio celular.
+- [x] `server/` com Worker + Durable Object `MuralRoom` (WebSocket Hibernation API,
+  storage SQLite, alarm de TTL 24h, reducer autoritativo, visão de presença).
+- [x] Protocolo JOIN/WELCOME/ACTION/STATE/PRESENCE/ACK com identidade playerId+token,
+  resync integral na reconexão e números de versão.
+- [x] Módulo cliente `games/mural` no hub: lobby (criar/entrar por código), board com
+  post-its coloridos, presença, overlay de RTT, reconexão com backoff + visibilitychange.
+- [x] Validado local (wrangler dev + proxy Vite): 13 checks de integração com 2 clientes,
+  persistência através de restart do servidor, broadcast ao vivo entre UI e segundo cliente.
+- [ ] **Deploy real no Cloudflare** (Worker + rota /api no domínio do Pages) — precisa da
+  conta do usuário.
+- [ ] QR code / link de convite no lobby.
+- [ ] **Critério de aceite final (usuário):** 3+ celulares reais na mesma sala, tela
+  apagando/4G oscilando, mural sobrevivendo a tudo.
 
 ### Fase 4 — Primeiro jogo conectado (o mais simples possível)
 - Ex.: quiz buzzer ou votação — poucas regras, estressa o protocolo em uso real.

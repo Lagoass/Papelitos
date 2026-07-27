@@ -10,6 +10,13 @@ export default defineConfig({
       '@games': fileURLToPath(new URL('./src/games', import.meta.url)),
     },
   },
+  server: {
+    // Dev: o Worker (wrangler dev) roda em 8787; o cliente fala sempre com a
+    // própria origem em /api — igual ao que será em produção (mesmo domínio).
+    proxy: {
+      '/api': { target: 'http://localhost:8787', ws: true },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

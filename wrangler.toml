@@ -1,0 +1,16 @@
+# Worker dos jogos conectados — Change.md fase 3.
+# Dev local: `npm run server` (wrangler dev, porta 8787; o Vite proxia /api pra cá).
+# Deploy real fica para depois do estudo local validado.
+name = "lagames-server"
+main = "server/index.js"
+compatibility_date = "2026-04-01"
+
+# Uma sala = um Durable Object. SQLite-backed (new_sqlite_classes) —
+# obrigatório no free tier e dá storage transacional embutido.
+[[durable_objects.bindings]]
+name = "MURAL_ROOM"
+class_name = "MuralRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MuralRoom"]

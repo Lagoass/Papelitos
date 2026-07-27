@@ -255,6 +255,34 @@ Partida dirigida no browser: palco tingido (rgb correto da cor do jogador), sem 
 
 ---
 
+## Fase 10 — Estudo Durable Objects + Mural de Papelitos (Change.md Fase 3, parte local)
+
+**Status:** `[x] Parte local concluída` — deploy real e teste multi-celular pendentes
+**Data:** 2026-05-27
+
+### O que foi implementado
+- [x] `wrangler.toml` + `server/index.js` (Worker: POST /api/room cria sala com código de 4 letras sem ambíguos; GET /:code existe; GET /:code/ws upgrade) + `server/rooms/mural.js` (DO `MuralRoom`).
+- [x] DO com **WebSocket Hibernation API** (`acceptWebSocket` + `setWebSocketAutoResponse` ping/pong sem acordar o objeto), storage SQLite (`new_sqlite_classes` — free tier), `blockConcurrencyWhile` no boot, alarm de TTL (24h sem atividade → sala evapora), attachments serializados (identidade sobrevive à hibernação).
+- [x] Protocolo Change.md §4.3: JOIN (novo/reconexão por playerId+token; token errado NÃO sequestra identidade), ACTION com seq → ACK (RTT), STATE versionado (cliente descarta atrasados), PRESENCE. Reducer autoritativo: ADD/EDIT/DELETE_NOTE atômicos, autor manda na própria nota, limites (280 chars, 200 notas).
+- [x] Cliente: `games/mural/` (lobby criar/entrar, board com post-its nas cores dos jogadores, presença com online/offline, chip de debug RTT+versão, edição inline das próprias notas) + `useRoom.js` (reconexão com backoff exponencial + retomada no visibilitychange, heartbeat 20s, resync via WELCOME). Registry + HomeScreen + lazy loading; proxy Vite `/api` → 8787 (mesmo caminho do futuro same-origin em produção).
+- [x] Script `npm run server` (wrangler dev na 8787).
+
+### Verificação
+- 13/13 checks de integração com 2 clientes Node reais (JOIN, broadcast, autorização, edição/apagamento, presença offline após queda, reconexão com mesma identidade + resync, anti-sequestro de token). RTT local ~2ms.
+- **Persistência:** sala e notas sobreviveram a dois restarts do wrangler (storage SQLite em .wrangler/state).
+- **UI e2e:** Home → card Mural → criar sala → nota via UI (chip 10ms · v1) → segundo cliente externo entrou e colou nota → **apareceu ao vivo no browser** (v2, presença atualizada).
+
+### Achados do estudo
+- `getWebSockets()` ainda pode conter o socket em fechamento durante `webSocketClose` — presença deve excluí-lo explicitamente (bug real encontrado pelos testes).
+- `wrangler dev` no Windows: matar só o processo da porta respawna o workerd — encerrar a árvore toda antes de reiniciar.
+
+### Próximos passos (dependem do usuário)
+1. Deploy real: `wrangler deploy` + rota `/api/*` no domínio do Pages (conta Cloudflare do usuário).
+2. QR/link de convite no lobby.
+3. Teste de festa: 3+ celulares reais, tela apagando, 4G oscilando.
+
+---
+
 ## Notas Gerais
 
 ### Padrões adotados ao longo do projeto

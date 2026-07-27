@@ -105,7 +105,12 @@ const HomeScreen = ({ onPlay }) => {
           <p className="anim-fade-up text-xs text-zinc-500 uppercase tracking-widest mb-3" style={{ animationDelay: `${nextDelay()}ms` }}>
             {CATEGORIES.connected.label}
           </p>
-          <GhostCard delay={nextDelay()} />
+          <div className="space-y-3">
+            {byCategory('connected').map(g => (
+              <HeroCard key={g.id} game={g} onPlay={onPlay} delay={nextDelay()} />
+            ))}
+            <GhostCard delay={nextDelay()} />
+          </div>
         </section>
       </div>
 

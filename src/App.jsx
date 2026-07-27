@@ -6,6 +6,7 @@ import { hasAnyOngoingGame } from '@shell/games.js'
 // Módulos de jogo carregados sob demanda — o bundle inicial é só o hub.
 const GAME_COMPONENTS = {
   papelito: lazy(() => import('./games/papelito/index.jsx')),
+  mural: lazy(() => import('./games/mural/index.jsx')),
 }
 
 const App = () => {
